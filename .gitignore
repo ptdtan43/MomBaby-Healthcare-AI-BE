@@ -1,0 +1,47 @@
+# =========================
+# ASP.NET Core (.NET)
+# =========================
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+.vs/
+*.user
+*.userosscache
+*.suo
+*.userprefs
+*.DS_Store
+appsettings.Development.json
+
+# =========================
+# Python (FastAPI / AI)
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.venv/
+.pytest_cache/
+
+# =========================
+# Environment Variables & Secrets
+# =========================
+.env
+.env.local
+*.secret
+credentials.json
+firebase-adminsdk.json
+
+# =========================
+# Logs and Databases
+# =========================
+*.log
+*.sqlite3
+*.db
+uploads/
+
+# =========================
+# OS generated files
+# =========================
+.DS_Store
+Thumbs.db
