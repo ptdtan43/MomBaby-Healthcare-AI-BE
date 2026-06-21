@@ -39,14 +39,6 @@ services:
     volumes:
       - pgdb_data:/var/lib/postgresql/data
 
-  frontend:         # React app
-    build:
-      context: .
-      dockerfile: mom-oi-frontend/Dockerfile
-    ports:
-      - "3000:80"
-    depends_on:
-      - momoi-api
 
 volumes:
   pgdb_data:
