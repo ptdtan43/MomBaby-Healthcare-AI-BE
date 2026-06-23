@@ -8,7 +8,7 @@ services:
     ports:
       - "8000:80"
     environment:
-      - ConnectionStrings__DefaultConnection=Host=pgdb;Port=5432;Database=MomOiDb;Username=postgres;Password=postgres;
+      - ConnectionStrings__DefaultConnection=Host=pgdb;Port=5432;Database=momoidb;Username=postgres;Password=postgres;
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - NutritionApiUrl=http://nutrition-api:8001
       - RunMigrationsOnStartup=true
@@ -18,20 +18,20 @@ services:
 
   nutrition-api:    # Python FastAPI (USDA engine)
     build:
-      context: .
-      dockerfile: MomOi.NutritionAPI/Dockerfile
+      context: ./MomOi.NutritionAPI
+      dockerfile: Dockerfile
     ports:
       - "8001:8001"
     environment:
       - USDA_API_KEY=${USDA_API_KEY}
-      - DATABASE_URL=postgresql://postgres:postgres@pgdb:5432/nutrition_db
+      - DATABASE_URL=postgresql://postgres:postgres@pgdb:5432/momoidb
     depends_on:
       - pgdb
 
   pgdb:             # PostgreSQL database (dùng chung cho cả C# API và Python API)
     image: postgres:15-alpine
     ports:
-      - "5432:5432"
+      - "5434:5432"
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
