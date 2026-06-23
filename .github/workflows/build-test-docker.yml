@@ -21,16 +21,13 @@ jobs:
         dotnet-version: '8.0.x'
 
     - name: Restore NuGet Packages
-      run: |
-        & "C:\Program Files\dotnet\dotnet.exe" restore MomOi.sln || dotnet restore MomOi.sln
+      run: dotnet restore MomOi.sln
 
     - name: Build Solution
-      run: |
-        & "C:\Program Files\dotnet\dotnet.exe" build MomOi.sln --no-restore --configuration Release || dotnet build MomOi.sln --no-restore --configuration Release
+      run: dotnet build MomOi.sln --no-restore --configuration Release
 
     - name: Execute Tests
-      run: |
-        & "C:\Program Files\dotnet\dotnet.exe" test MomOi.Tests/MomOi.Tests.csproj --no-build --configuration Release --verbosity normal || dotnet test MomOi.Tests/MomOi.Tests.csproj --no-build --configuration Release --verbosity normal
+      run: dotnet test MomOi.Tests/MomOi.Tests.csproj --no-build --configuration Release --verbosity normal
 
   docker-build-push:
     name: Package Docker Image
