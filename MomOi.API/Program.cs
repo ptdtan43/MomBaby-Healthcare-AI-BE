@@ -34,6 +34,9 @@ using MomOi.API.Services.Recipe;
 using MomOi.API.Services.Alert;
 using MomOi.API.Services.UserProfile;
 using MomOi.API.Services.Admin;
+using MomOi.API.Services.Expert;
+using MomOi.API.Services.Mom;
+using MomOi.API.Services.Integration;
 using MomOi.API.Services.Report;
 using MomOi.API.Services.AIFeatures;
 using MomOi.API.BackgroundServices;
@@ -104,10 +107,13 @@ builder.Services.AddScoped<IRecipeService, RecipeService>();
 builder.Services.AddScoped<IAlertService, AlertService>();
 builder.Services.AddScoped<IUserProfileService, UserProfileService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
+builder.Services.AddScoped<IExpertService, ExpertService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IAIFeatureService, AIFeatureService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IMomService, MomService>();
 builder.Services.AddScoped<IBusinessRuleEngine, BusinessRuleEngine>();
+builder.Services.AddHttpClient<IUsdaClientService, UsdaClientService>();
 builder.Services.AddSingleton<IEmailService, EmailService>();
 builder.Services.AddSingleton<ISmsService, SmsService>();
 builder.Services.AddSingleton<IPushNotificationService, PushNotificationService>();
@@ -268,6 +274,10 @@ if (builder.Configuration["RunMigrationsOnStartup"] == "true")
     {
         dbContext.Database.Migrate();
         Console.WriteLine("Database migrations applied successfully.");
+        
+        // Seed default roles and admin users
+        await MomOi.API.Data.DbInitializer.InitializeAsync(scope.ServiceProvider);
+        Console.WriteLine("Default roles and users seeded successfully.");
     }
     catch (Exception ex)
     {

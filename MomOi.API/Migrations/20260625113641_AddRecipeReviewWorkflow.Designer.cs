@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using MomOi.API.Data;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MomOi.API.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260625113641_AddRecipeReviewWorkflow")]
+    partial class AddRecipeReviewWorkflow
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -239,66 +242,6 @@ namespace MomOi.API.Migrations
                         .HasDatabaseName("ix_baby_profiles_user_id");
 
                     b.ToTable("baby_profiles", (string)null);
-                });
-
-            modelBuilder.Entity("MomOi.API.Models.Health.BusinessRule", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("code");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("description");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_active");
-
-                    b.Property<string>("Operator")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("operator");
-
-                    b.Property<int>("Severity")
-                        .HasColumnType("integer")
-                        .HasColumnName("severity");
-
-                    b.Property<string>("TargetMetric")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("target_metric");
-
-                    b.Property<float>("ThresholdValue")
-                        .HasColumnType("real")
-                        .HasColumnName("threshold_value");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("title");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id")
-                        .HasName("pk_business_rules");
-
-                    b.ToTable("business_rules", (string)null);
                 });
 
             modelBuilder.Entity("MomOi.API.Models.Health.ChatMessage", b =>
@@ -1669,50 +1612,6 @@ namespace MomOi.API.Migrations
                         .HasDatabaseName("ix_meal_logs_user_id");
 
                     b.ToTable("meal_logs", (string)null);
-                });
-
-            modelBuilder.Entity("MomOi.API.Models.Nutrition.UsdaFoodItem", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<float>("Calories")
-                        .HasColumnType("real")
-                        .HasColumnName("calories");
-
-                    b.Property<float>("Carbs")
-                        .HasColumnType("real")
-                        .HasColumnName("carbs");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("description");
-
-                    b.Property<float>("Fat")
-                        .HasColumnType("real")
-                        .HasColumnName("fat");
-
-                    b.Property<int>("FdcId")
-                        .HasColumnType("integer")
-                        .HasColumnName("fdc_id");
-
-                    b.Property<float>("Protein")
-                        .HasColumnType("real")
-                        .HasColumnName("protein");
-
-                    b.Property<DateTime>("SyncDate")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("sync_date");
-
-                    b.HasKey("Id")
-                        .HasName("pk_usda_food_items");
-
-                    b.ToTable("usda_food_items", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>

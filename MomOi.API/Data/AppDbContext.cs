@@ -42,6 +42,10 @@ namespace MomOi.API.Data
         public DbSet<Recipe> Recipes { get; set; } = null!;
         public DbSet<DietPlan> DietPlans { get; set; } = null!;
 
+        // --- Sprint 3: Advanced Admin ---
+        public DbSet<BusinessRule> BusinessRules { get; set; } = null!;
+        public DbSet<UsdaFoodItem> UsdaFoodItems { get; set; } = null!;
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);

@@ -21,5 +21,10 @@ namespace MomOi.API.DTOs.Auth
         /// Current subscription tier.
         /// </summary>
         public SubscriptionTier Tier { get; set; }
+
+        /// <summary>
+        /// Roles assigned to the user (e.g. "Mom", "Admin", "Expert", "Staff").
+        /// </summary>
+        public IList<string> Roles { get; set; } = new List<string>();
     }
 }

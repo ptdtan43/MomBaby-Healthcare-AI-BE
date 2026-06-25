@@ -6,6 +6,7 @@ using MomOi.API.DTOs.Auth;
 using MomOi.API.Models.Health;
 using MomOi.API.Models.Identity;
 using System;
+using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -19,15 +20,18 @@ namespace MomOi.API.Services.Auth
     public class AuthService : IAuthService
     {
         private readonly UserManager<AppUser> _userManager;
+        private readonly RoleManager<IdentityRole> _roleManager;
         private readonly AppDbContext _context;
         private readonly IConfiguration _configuration;
 
         public AuthService(
             UserManager<AppUser> userManager,
+            RoleManager<IdentityRole> roleManager,
             AppDbContext context,
             IConfiguration configuration)
         {
             _userManager = userManager;
+            _roleManager = roleManager;
             _context = context;
             _configuration = configuration;
         }
@@ -56,6 +60,9 @@ namespace MomOi.API.Services.Auth
                 throw new InvalidOperationException($"Đăng ký thất bại: {errors}");
             }
 
+            // Assign default Mom role
+            await _userManager.AddToRoleAsync(user, AppRoles.Mom);
+
             // PII & Health separation: Initialize empty MomHealthProfile in health table
             var healthProfile = new MomHealthProfile
             {
@@ -68,13 +75,14 @@ namespace MomOi.API.Services.Auth
             await _context.SaveChangesAsync();
 
             // Generate JWT and Refresh token
-            var token = GenerateJwtToken(user);
+            var token = await GenerateJwtTokenAsync(user);
             var refreshToken = GenerateRefreshToken();
 
             user.RefreshToken = refreshToken;
             user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(30);
             await _userManager.UpdateAsync(user);
 
+            var roles = await _userManager.GetRolesAsync(user);
             return new AuthResponseDto
             {
                 Token = token,
@@ -83,7 +91,8 @@ namespace MomOi.API.Services.Auth
                 {
                     Id = user.Id,
                     Email = user.Email!,
-                    Tier = user.Tier
+                    Tier = user.Tier,
+                    Roles = roles
                 }
             };
         }
@@ -96,13 +105,14 @@ namespace MomOi.API.Services.Auth
                 throw new UnauthorizedAccessException("Email hoặc mật khẩu không chính xác.");
             }
 
-            var token = GenerateJwtToken(user);
+            var token = await GenerateJwtTokenAsync(user);
             var refreshToken = GenerateRefreshToken();
 
             user.RefreshToken = refreshToken;
             user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(30);
             await _userManager.UpdateAsync(user);
 
+            var roles = await _userManager.GetRolesAsync(user);
             return new AuthResponseDto
             {
                 Token = token,
@@ -111,7 +121,8 @@ namespace MomOi.API.Services.Auth
                 {
                     Id = user.Id,
                     Email = user.Email!,
-                    Tier = user.Tier
+                    Tier = user.Tier,
+                    Roles = roles
                 }
             };
         }
@@ -135,13 +146,14 @@ namespace MomOi.API.Services.Auth
                 throw new UnauthorizedAccessException("Refresh Token không hợp lệ hoặc đã hết hạn.");
             }
 
-            var newToken = GenerateJwtToken(user);
+            var newToken = await GenerateJwtTokenAsync(user);
             var newRefreshToken = GenerateRefreshToken();
 
             user.RefreshToken = newRefreshToken;
             user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(30);
             await _userManager.UpdateAsync(user);
 
+            var roles = await _userManager.GetRolesAsync(user);
             return new AuthResponseDto
             {
                 Token = newToken,
@@ -150,7 +162,8 @@ namespace MomOi.API.Services.Auth
                 {
                     Id = user.Id,
                     Email = user.Email!,
-                    Tier = user.Tier
+                    Tier = user.Tier,
+                    Roles = roles
                 }
             };
         }
@@ -166,9 +179,9 @@ namespace MomOi.API.Services.Auth
             }
         }
 
-        private string GenerateJwtToken(AppUser user)
+        private async Task<string> GenerateJwtTokenAsync(AppUser user)
         {
-            var claims = new[]
+            var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id),
                 new Claim(ClaimTypes.Name, user.UserName ?? string.Empty),
@@ -176,6 +189,12 @@ namespace MomOi.API.Services.Auth
                 new Claim("fullname", user.FullName),
                 new Claim("tier", ((int)user.Tier).ToString())
             };
+
+            var roles = await _userManager.GetRolesAsync(user);
+            foreach (var role in roles)
+            {
+                claims.Add(new Claim(ClaimTypes.Role, role));
+            }
 
             var signingKey = RsaKeyHelper.GetSigningKey(_configuration);
             var credentials = new SigningCredentials(signingKey, SecurityAlgorithms.RsaSha256);
