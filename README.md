@@ -5,7 +5,7 @@
   <img src="https://img.shields.io/badge/Gemini_AI-8E75B2?style=for-the-badge&logo=googlebard&logoColor=white" alt="Gemini AI"/>
   
   <h1>MomOi - Hệ sinh thái chăm sóc sức khỏe Mẹ & Bé</h1>
-  <p>Dự án Capstone: Nền tảng Y tế Ứng dụng Trí tuệ Nhân tạo (AI)</p>
+  <p>Dự án EXE101: Nền tảng Y tế Ứng dụng Trí tuệ Nhân tạo (AI)</p>
 </div>
 
 ## 📖 Bảng Mục lục
