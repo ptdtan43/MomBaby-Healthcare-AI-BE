@@ -178,7 +178,7 @@ YÊU CẦU ĐẦU RA (Chỉ trả về chuỗi JSON Array nguyên bản, KHÔNG 
                 // Validate if it's actual JSON
                 var jsonDoc = JsonDocument.Parse(aiResponseJson);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 // Fallback to static mock JSON if Gemini fails or API key is not configured
                 aiResponseJson = @"[

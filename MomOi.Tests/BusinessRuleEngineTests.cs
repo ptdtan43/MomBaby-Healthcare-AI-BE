@@ -312,7 +312,7 @@ namespace MomOi.Tests
                 UserId = "user-6",
                 BabyName = "Minh",
                 DateOfBirth = DateTime.UtcNow.AddDays(-210), // ~7 months old
-                Gender = "male",
+                Gender = MomOi.API.Models.Gender.Male,
                 FoodHistory = new[] { "breast_milk", "formula" } // solid_food is missing
             };
 
@@ -345,7 +345,7 @@ namespace MomOi.Tests
             {
                 UserId = "user-7",
                 DateOfBirth = DateTime.UtcNow.AddDays(-240), // ~8 months old
-                Gender = "female"
+                Gender = MomOi.API.Models.Gender.Female
             };
 
             var todayLog = new BabyFoodLog
@@ -377,7 +377,7 @@ namespace MomOi.Tests
             {
                 UserId = "user-8",
                 DateOfBirth = DateTime.UtcNow.AddDays(-300), // ~10 months old
-                Gender = "male"
+                Gender = MomOi.API.Models.Gender.Male
             };
 
             var todayLog = new BabyFoodLog
@@ -410,7 +410,7 @@ namespace MomOi.Tests
                 Id = 1,
                 UserId = "user-9",
                 DateOfBirth = DateTime.UtcNow.AddDays(-200),
-                Gender = "male",
+                Gender = MomOi.API.Models.Gender.Male,
                 Allergies = Array.Empty<string>()
             };
             context.BabyProfiles.Add(baby);
@@ -452,7 +452,7 @@ namespace MomOi.Tests
             {
                 UserId = "user-10",
                 DateOfBirth = DateTime.UtcNow.AddDays(-450), // ~15 months old
-                Gender = "female"
+                Gender = MomOi.API.Models.Gender.Female
             };
 
             var todayLog = new BabyFoodLog
