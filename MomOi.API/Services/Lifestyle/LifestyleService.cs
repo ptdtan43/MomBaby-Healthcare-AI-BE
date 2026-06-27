@@ -1,4 +1,5 @@
 using MomOi.API.DTOs;
+using MomOi.API.Models;
 using MomOi.API.Models.Health;
 using MomOi.API.Repositories;
 using MomOi.API.Services.BusinessRules;
@@ -29,53 +30,56 @@ namespace MomOi.API.Services.Lifestyle
 
         public async Task<ApiResponse<object>> SubmitLifestyleEntryAsync(string userId, LifestyleEntryRequestDto request)
         {
-            if (request.Gpa > 4.0f)
-                return ApiResponse<object>.FailureResult("GPA không được vượt quá 4.0.");
-
             var validStress = new[] { "Low", "Moderate", "High" };
             if (!validStress.Contains(request.StressLevel))
                 return ApiResponse<object>.FailureResult("Mức độ căng thẳng phải là: 'Low', 'Moderate', hoặc 'High'.");
 
             var today = DateTime.UtcNow.Date;
 
-            var healthScore = ComputeHealthScore(request);
-            var lifestyleProfile = ClassifyProfile(request);
-
             var existing = await _entryRepo.FirstOrDefaultAsync(e => e.UserId == userId && e.Date == today);
 
             if (existing != null)
             {
-                existing.StudyHours = request.StudyHours;
+                existing.SelfCareHours = request.SelfCareHours;
                 existing.SleepHours = request.SleepHours;
                 existing.PhysicalHours = request.PhysicalHours;
                 existing.SocialHours = request.SocialHours;
-                existing.ExtracurricularHours = request.ExtracurricularHours;
-                existing.Gpa = request.Gpa;
-                existing.StressLevel = request.StressLevel;
-                existing.HealthScore = healthScore;
-                existing.LifestyleProfile = lifestyleProfile;
+                existing.WaterLiters = request.WaterLiters;
+
+                if (Enum.TryParse<StressLevel>(request.StressLevel, true, out var stress))
+                {
+                    existing.StressLevel = stress;
+                }
+
+                existing.HealthScore = ComputeHealthScore(request);
+                existing.LifestyleProfile = ClassifyProfile(request);
                 existing.UpdatedAt = DateTime.UtcNow;
                 _entryRepo.Update(existing);
             }
             else
             {
-                existing = new LifestyleEntry
+                var entry = new LifestyleEntry
                 {
                     UserId = userId,
                     Date = today,
-                    StudyHours = request.StudyHours,
+                    SelfCareHours = request.SelfCareHours,
                     SleepHours = request.SleepHours,
                     PhysicalHours = request.PhysicalHours,
                     SocialHours = request.SocialHours,
-                    ExtracurricularHours = request.ExtracurricularHours,
-                    Gpa = request.Gpa,
-                    StressLevel = request.StressLevel,
-                    HealthScore = healthScore,
-                    LifestyleProfile = lifestyleProfile,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
+                    WaterLiters = request.WaterLiters,
+                    HealthScore = ComputeHealthScore(request),
+                    LifestyleProfile = ClassifyProfile(request)
                 };
-                await _entryRepo.AddAsync(existing);
+
+                if (Enum.TryParse<StressLevel>(request.StressLevel, true, out var stress))
+                {
+                    entry.StressLevel = stress;
+                }
+                entry.CreatedAt = DateTime.UtcNow;
+                entry.UpdatedAt = DateTime.UtcNow;
+                
+                await _entryRepo.AddAsync(entry);
+                existing = entry;
             }
 
             await _entryRepo.SaveChangesAsync();
@@ -192,11 +196,10 @@ namespace MomOi.API.Services.Lifestyle
 
             var radarData = new
             {
-                study = Math.Min(100, (int)Math.Round(latest.StudyHours / 8 * 100)),
                 sleep = Math.Min(100, (int)Math.Round(latest.SleepHours / 8 * 100)),
                 physical = Math.Min(100, (int)Math.Round(latest.PhysicalHours / 1.5 * 100)),
-                social = Math.Min(100, (int)Math.Round(latest.SocialHours / 3 * 100)),
-                gpa = Math.Min(100, (int)Math.Round(latest.Gpa / 4.0 * 100))
+                selfCare = Math.Min(100, (int)Math.Round(latest.SelfCareHours / 2 * 100)),
+                water = Math.Min(100, (int)Math.Round(latest.WaterLiters / 2.5 * 100))
             };
 
             var scoreTrends = entries
@@ -223,22 +226,28 @@ namespace MomOi.API.Services.Lifestyle
 
         private static int ComputeHealthScore(LifestyleEntryRequestDto r)
         {
-            double score = 0;
-            score += Math.Min(30, r.SleepHours / 8.0 * 30);
-            score += Math.Min(25, r.PhysicalHours / 1.5 * 25);
-            score += Math.Min(25, r.Gpa / 4.0 * 25);
-            score += Math.Min(10, r.SocialHours / 3.0 * 10);
-            score += r.StressLevel switch { "Low" => 10, "Moderate" => 5, _ => 0 };
-            return (int)Math.Round(Math.Min(100, score));
+            float score = 100;
+            if (r.SleepHours < 7) score -= 15;
+            if (r.PhysicalHours < 0.5) score -= 10;
+            if (r.SelfCareHours < 1) score -= 10;
+            if (r.WaterLiters < 2) score -= 10;
+            if (r.StressLevel == "High") score -= 20;
+
+            return (int)Math.Max(0, Math.Min(100, score));
         }
 
-        private static string ClassifyProfile(LifestyleEntryRequestDto r)
+        private static MaternalLifestyleProfile ClassifyProfile(LifestyleEntryRequestDto r)
         {
-            if (r.SleepHours < 5 || r.StressLevel == "High") return "Burned Out";
-            if (r.PhysicalHours < 0.5 && r.SocialHours < 1) return "Couch Scholar";
-            if (r.StudyHours > 10 && r.SleepHours < 6) return "Overachiever";
-            if (r.SleepHours >= 7 && r.PhysicalHours >= 1 && r.SocialHours >= 1) return "Balanced";
-            return "Unknown";
+            if (r.StressLevel == "High" && r.SleepHours < 6)
+                return MaternalLifestyleProfile.Exhausted;
+            if (r.PhysicalHours < 0.5)
+                return MaternalLifestyleProfile.Sedentary;
+            if (r.PhysicalHours >= 1 && r.SleepHours >= 7 && r.SelfCareHours >= 1)
+                return MaternalLifestyleProfile.Active;
+            if (r.SleepHours >= 6)
+                return MaternalLifestyleProfile.Balanced;
+
+            return MaternalLifestyleProfile.Unknown;
         }
 
         #endregion

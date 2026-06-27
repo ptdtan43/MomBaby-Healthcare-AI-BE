@@ -1,4 +1,4 @@
-using System;
+using MomOi.API.Models.Identity;
 
 namespace MomOi.API.Models.Health
 {
@@ -18,10 +18,10 @@ namespace MomOi.API.Models.Health
     /// <summary>
     /// Logs critical and warning clinical alerts triggered by the business rules engine.
     /// </summary>
-    public class CriticalAlertLog
+    public class CriticalAlertLog : BaseEntity
     {
-        public int Id { get; set; }
         public string UserId { get; set; } = string.Empty;
+        public AppUser User { get; set; } = null!;
         public string RuleId { get; set; } = string.Empty;
         public AlertSeverity Severity { get; set; } = AlertSeverity.Info;
         public string TitleVi { get; set; } = string.Empty;

@@ -1,9 +1,15 @@
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Query;
+using MomOi.API.Models;
 using MomOi.API.Models.Health;
 using MomOi.API.Models.Identity;
 using MomOi.API.Models.Nutrition;
 using System;
+using System.Linq;
+using System.Linq.Expressions;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace MomOi.API.Data
 {
@@ -45,6 +51,31 @@ namespace MomOi.API.Data
         // --- Sprint 3: Advanced Admin ---
         public DbSet<BusinessRule> BusinessRules { get; set; } = null!;
         public DbSet<UsdaFoodItem> UsdaFoodItems { get; set; } = null!;
+
+        // --- Phase 4 ---
+        public DbSet<PaymentTransaction> PaymentTransactions { get; set; } = null!;
+        public DbSet<VaccinationRecord> VaccinationRecords { get; set; } = null!;
+
+        public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            var entries = ChangeTracker.Entries<BaseEntity>();
+
+            foreach (var entry in entries)
+            {
+                switch (entry.State)
+                {
+                    case EntityState.Added:
+                        entry.Entity.CreatedAt = DateTime.UtcNow;
+                        entry.Entity.UpdatedAt = DateTime.UtcNow;
+                        break;
+                    case EntityState.Modified:
+                        entry.Entity.UpdatedAt = DateTime.UtcNow;
+                        break;
+                }
+            }
+
+            return await base.SaveChangesAsync(cancellationToken);
+        }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -97,6 +128,13 @@ namespace MomOi.API.Data
                 .HasForeignKey(m => m.ChatSessionId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            // VaccinationRecord to BabyProfile
+            builder.Entity<VaccinationRecord>()
+                .HasOne(v => v.BabyProfile)
+                .WithMany()
+                .HasForeignKey(v => v.BabyProfileId)
+                .OnDelete(DeleteBehavior.Cascade);
+
             // MedicationSchedule 1-to-many AdherenceLogs
             builder.Entity<MedicationAdherenceLog>()
                 .HasOne(a => a.Schedule)
@@ -116,6 +154,15 @@ namespace MomOi.API.Data
             builder.Entity<NotificationAlert>().HasIndex(n => n.UserId);
             builder.Entity<Recipe>().HasIndex(r => r.UserId);
             builder.Entity<DietPlan>().HasIndex(d => d.UserId);
+            builder.Entity<PaymentTransaction>().HasIndex(p => p.UserId);
+            builder.Entity<VaccinationRecord>().HasIndex(v => v.BabyProfileId);
+
+            builder.Entity<Recipe>().HasIndex(r => r.Status);
+            builder.Entity<Recipe>().HasIndex(r => r.ProfileStage);
+            builder.Entity<CriticalAlertLog>().HasIndex(c => c.IsResolved);
+            builder.Entity<NotificationAlert>().HasIndex(n => n.Status);
+            builder.Entity<SymptomLog>().HasIndex(s => s.AlertFlag);
+            builder.Entity<UsdaFoodItem>().HasIndex(u => u.FdcId).IsUnique();
         }
     }
 }

@@ -1,14 +1,14 @@
-using System;
+using MomOi.API.Models.Identity;
 
 namespace MomOi.API.Models.Health
 {
     /// <summary>
     /// Represents physical exercise or daily step logs recorded by a pregnant user.
     /// </summary>
-    public class ExerciseLog
+    public class ExerciseLog : BaseEntity
     {
-        public int Id { get; set; }
         public string UserId { get; set; } = string.Empty;
+        public AppUser User { get; set; } = null!;
         public int StepCount { get; set; }
         public string ExerciseType { get; set; } = string.Empty; // e.g. "Walking", "Yoga", "Swimming"
         public int DurationMinutes { get; set; }

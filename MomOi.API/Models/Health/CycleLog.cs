@@ -5,13 +5,8 @@ namespace MomOi.API.Models.Health
     /// <summary>
     /// Represents a log of a menstrual cycle (used during PrePregnancy stage).
     /// </summary>
-    public class CycleLog
+    public class CycleLog : BaseEntity
     {
-        /// <summary>
-        /// Unique primary key.
-        /// </summary>
-        public int Id { get; set; }
-
         /// <summary>
         /// Foreign key to MomHealthProfile.
         /// </summary>

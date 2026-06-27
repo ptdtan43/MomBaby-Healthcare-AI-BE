@@ -1,7 +1,11 @@
+using Microsoft.EntityFrameworkCore;
+using MomOi.API.Data;
 using MomOi.API.DTOs;
+using MomOi.API.Models;
 using MomOi.API.Models.Health;
 using MomOi.API.Repositories;
 using MomOi.API.Services.AI;
+using MomOi.API.Services.Integration;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -50,7 +54,7 @@ namespace MomOi.API.Services.Symptom
 
             string aiResponseJson = string.Empty;
             int severityScore = 0;
-            string urgencyLevel = "Thấp";
+            UrgencyLevel urgencyLevel = UrgencyLevel.Low;
             bool shouldSeeDoctor = false;
 
             try
@@ -61,7 +65,7 @@ namespace MomOi.API.Services.Symptom
                 if (doc.RootElement.TryGetProperty("severityScore", out var scoreEl))
                     severityScore = scoreEl.GetInt32();
                 if (doc.RootElement.TryGetProperty("urgencyLevel", out var urgencyEl))
-                    urgencyLevel = urgencyEl.GetString() ?? "Thấp";
+                    Enum.TryParse(urgencyEl.GetString(), out urgencyLevel);
                 if (doc.RootElement.TryGetProperty("shouldSeeDoctor", out var doctorEl))
                     shouldSeeDoctor = doctorEl.GetBoolean();
             }
@@ -97,9 +101,9 @@ namespace MomOi.API.Services.Symptom
             {
                 await _alertRepo.AddAsync(new NotificationAlert
                 {
-                    UserId = userId,
+                    UserId = log.UserId,
                     Type = NotificationAlertType.Symptom,
-                    Severity = severityScore,
+                    Severity = AlertSeverity.Medium,
                     Message = $"Phát hiện triệu chứng nghiêm trọng (điểm {severityScore}/100). Vui lòng liên hệ bác sĩ ngay.",
                     Status = NotificationStatus.Pending,
                     Channels = new[] { "email", "app" },

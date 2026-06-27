@@ -1,4 +1,4 @@
-using System;
+using MomOi.API.Models.Identity;
 
 namespace MomOi.API.Models.Health
 {
@@ -26,24 +26,19 @@ namespace MomOi.API.Models.Health
     /// A notification/alert record for symptom, medication, or routine check reminders.
     /// Maps from MongoDB Alert schema.
     /// </summary>
-    public class NotificationAlert
+    public class NotificationAlert : BaseEntity
     {
-        public int Id { get; set; }
-
         public string UserId { get; set; } = string.Empty;
+        public AppUser User { get; set; } = null!;
 
         public NotificationAlertType Type { get; set; }
 
-        public int Severity { get; set; }
+        public AlertSeverity Severity { get; set; }
 
         public string Message { get; set; } = string.Empty;
 
         public NotificationStatus Status { get; set; } = NotificationStatus.Pending;
 
-        /// <summary>Delivery channels (e.g. "email", "sms", "push"). PostgreSQL text array.</summary>
         public string[] Channels { get; set; } = Array.Empty<string>();
-
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     }
 }

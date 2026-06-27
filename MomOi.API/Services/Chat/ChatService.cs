@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using MomOi.API.Data;
 using MomOi.API.DTOs;
+using MomOi.API.Models;
 using MomOi.API.Models.Health;
 using MomOi.API.Services.AI;
+using MomOi.API.Services.Integration;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -54,14 +56,14 @@ namespace MomOi.API.Services.Chat
             _context.ChatMessages.Add(new ChatMessage
             {
                 ChatSessionId = session.Id,
-                Sender = "user",
+                Sender = SenderType.User,
                 Text = request.Text,
                 Timestamp = DateTime.UtcNow
             });
             _context.ChatMessages.Add(new ChatMessage
             {
                 ChatSessionId = session.Id,
-                Sender = "bot",
+                Sender = SenderType.Bot,
                 Text = botReply,
                 Timestamp = DateTime.UtcNow
             });

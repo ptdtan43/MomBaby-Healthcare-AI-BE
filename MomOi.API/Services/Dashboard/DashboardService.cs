@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using MomOi.API.Data;
 using MomOi.API.DTOs;
+using MomOi.API.Models;
+using MomOi.API.Models.Health;
 using System;
 using System.Linq;
 using System.Text.Json;
@@ -88,7 +90,7 @@ namespace MomOi.API.Services.Dashboard
                 dosage = m.Dosage,
                 times = m.Times,
                 notes = m.Notes,
-                status = m.AdherenceLogs.FirstOrDefault(l => l.Date.Date == todayDate)?.Status ?? "pending",
+                status = m.AdherenceLogs.FirstOrDefault(l => l.Date.Date == todayDate)?.Status.ToString().ToLower() ?? "pending",
                 startDate = m.StartDate,
                 endDate = m.EndDate
             });

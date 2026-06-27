@@ -1,4 +1,4 @@
-using System;
+using MomOi.API.Models.Identity;
 
 namespace MomOi.API.Models.Health
 {
@@ -20,11 +20,10 @@ namespace MomOi.API.Models.Health
     /// Maps from MongoDB Recipe schema.
     /// Stage-specific for pre-natal, pregnant, or post-natal mothers.
     /// </summary>
-    public class Recipe
+    public class Recipe : BaseEntity
     {
-        public int Id { get; set; }
-
         public string UserId { get; set; } = string.Empty;
+        public AppUser User { get; set; } = null!;
 
         /// <summary>Maternal journey stage: "pre-natal", "pregnant", "post-natal".</summary>
         public string ProfileStage { get; set; } = string.Empty;
@@ -45,13 +44,13 @@ namespace MomOi.API.Models.Health
 
         // --- Nutrition Info (flattened) ---
         public int Calories { get; set; }
-        public string Protein { get; set; } = string.Empty;
-        public string Carbs { get; set; } = string.Empty;
-        public string Fat { get; set; } = string.Empty;
-        public string PrepTime { get; set; } = string.Empty;
+        public float Protein { get; set; }
+        public float Carbs { get; set; }
+        public float Fat { get; set; }
+        public int PrepTimeMinutes { get; set; }
 
-        /// <summary>"Dễ", "Trung bình", "Khó"</summary>
-        public string Difficulty { get; set; } = "Dễ";
+        /// <summary>Easy, Medium, Hard</summary>
+        public Difficulty Difficulty { get; set; } = Difficulty.Easy;
 
         /// <summary>Searchable tags as PostgreSQL text array.</summary>
         public string[] Tags { get; set; } = Array.Empty<string>();
@@ -78,7 +77,5 @@ namespace MomOi.API.Models.Health
         public DateTime? ReviewedAt { get; set; }
 
         public DateTime GeneratedAt { get; set; } = DateTime.UtcNow;
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     }
 }

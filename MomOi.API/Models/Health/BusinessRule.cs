@@ -6,10 +6,8 @@ namespace MomOi.API.Models.Health
     /// Represents a dynamic business rule for health evaluations.
     /// Can be created/updated by Admin to trigger alerts.
     /// </summary>
-    public class BusinessRule
+    public class BusinessRule : BaseEntity
     {
-        public int Id { get; set; }
-
         /// <summary>Unique identifier code (e.g., BR01, BR02)</summary>
         public string Code { get; set; } = string.Empty;
 
@@ -40,8 +38,5 @@ namespace MomOi.API.Models.Health
         public AlertSeverity Severity { get; set; } = AlertSeverity.Info;
 
         public bool IsActive { get; set; } = true;
-
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     }
 }

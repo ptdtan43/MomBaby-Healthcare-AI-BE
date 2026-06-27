@@ -1,7 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using MomOi.API.Data;
 using MomOi.API.DTOs;
+using MomOi.API.Models;
 using MomOi.API.Models.Health;
+using MomOi.API.Repositories;
+using MomOi.API.Services.Alert;
 using System;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -90,7 +93,7 @@ namespace MomOi.API.Services.Medication
             var existing = schedule.AdherenceLogs.FirstOrDefault(l => l.Date.Date == targetDate);
             if (existing != null)
             {
-                existing.Status = request.Status;
+                existing.Status = Enum.TryParse<AdherenceStatus>(request.Status, true, out var s2) ? s2 : AdherenceStatus.Taken;
                 _context.MedicationAdherenceLogs.Update(existing);
             }
             else
@@ -99,7 +102,7 @@ namespace MomOi.API.Services.Medication
                 {
                     MedicationScheduleId = schedule.Id,
                     Date = targetDate,
-                    Status = request.Status
+                    Status = Enum.TryParse<AdherenceStatus>(request.Status, true, out var s1) ? s1 : AdherenceStatus.Taken
                 });
             }
 

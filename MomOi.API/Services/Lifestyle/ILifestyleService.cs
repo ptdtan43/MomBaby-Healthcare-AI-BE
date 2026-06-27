@@ -5,12 +5,11 @@ namespace MomOi.API.Services.Lifestyle
 {
     public class LifestyleEntryRequestDto
     {
-        public float StudyHours { get; set; }
+        public float SelfCareHours { get; set; }
         public float SleepHours { get; set; }
         public float PhysicalHours { get; set; }
         public float SocialHours { get; set; }
-        public float ExtracurricularHours { get; set; }
-        public float Gpa { get; set; }
+        public float WaterLiters { get; set; }
         public string StressLevel { get; set; } = "Low";
     }
 

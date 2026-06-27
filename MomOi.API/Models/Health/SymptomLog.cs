@@ -1,4 +1,4 @@
-using System;
+using MomOi.API.Models.Identity;
 
 namespace MomOi.API.Models.Health
 {
@@ -6,11 +6,10 @@ namespace MomOi.API.Models.Health
     /// AI-powered symptom analysis record with diagnostic suggestions.
     /// Merges MongoDB SymptomEntry and SymptomAnalysis schemas into one relational entity.
     /// </summary>
-    public class SymptomLog
+    public class SymptomLog : BaseEntity
     {
-        public int Id { get; set; }
-
         public string UserId { get; set; } = string.Empty;
+        public AppUser User { get; set; } = null!;
 
         /// <summary>User's text description of their symptoms.</summary>
         public string TextDescription { get; set; } = string.Empty;
@@ -34,8 +33,8 @@ namespace MomOi.API.Models.Health
 
         public string? LifestyleConnection { get; set; }
 
-        /// <summary>"Thấp", "Trung bình", "Cao", "Khẩn cấp"</summary>
-        public string? UrgencyLevel { get; set; }
+        /// <summary>Low, Medium, High, Critical</summary>
+        public UrgencyLevel? UrgencyLevel { get; set; }
 
         public string? UrgencyReason { get; set; }
 
@@ -57,8 +56,5 @@ namespace MomOi.API.Models.Health
         public int? ProcessingTimeMs { get; set; }
         public string GeminiModel { get; set; } = "gemini-1.5-pro";
         public bool IsAdminReviewRequired { get; set; } = false;
-
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     }
 }

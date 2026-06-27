@@ -3,7 +3,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using MomOi.API.Data;
+using MomOi.API.Models;
 using MomOi.API.Models.Health;
+using MomOi.API.Services.Integration;
 using MomOi.API.Services.Notifications;
 using System;
 using System.Linq;
@@ -63,17 +65,15 @@ namespace MomOi.API.BackgroundServices
             {
                 if (schedule.Times.Contains(timeNow))
                 {
-                    // Check if already taken or reminded
-                    bool hasRemindedOrTaken = schedule.AdherenceLogs
-                        .Any(log => log.Date.Date == todayStr && (log.Status == "taken" || log.Status == "reminded"));
+                    // Check if already taken or skipped
+                    bool alreadyLogged = schedule.AdherenceLogs
+                        .Any(a => a.Date.Date == todayStr && (a.Status == AdherenceStatus.Taken || a.Status == AdherenceStatus.Skipped));
 
-                    if (!hasRemindedOrTaken)
+                    if (!alreadyLogged)
                     {
                         var user = await dbContext.Users.FirstOrDefaultAsync(u => u.Id == schedule.UserId, stoppingToken);
                         if (user != null)
                         {
-                            var message = $"Đã đến giờ uống thuốc: {schedule.MedName} - Liều lượng: {schedule.Dosage}. Hãy uống thuốc đúng giờ nhé mẹ bầu!";
-                            
                             // Send Push Notification
                             // In a real app we would have FCM token stored in user model. Assuming logic handles it inside service.
                             // We can also create a NotificationAlert DB entry.
@@ -81,20 +81,21 @@ namespace MomOi.API.BackgroundServices
                             {
                                 UserId = user.Id,
                                 Type = NotificationAlertType.Medication,
-                                Severity = 50,
-                                Message = message,
-                                Channels = new[] { "app" },
-                                Status = NotificationStatus.Sent,
+                                Severity = AlertSeverity.Info,
+                                Message = $"Đã đến giờ uống thuốc: {schedule.MedName} ({schedule.Dosage}). Nhớ đánh dấu sau khi uống nhé!",
+                                Status = NotificationStatus.Pending,
                                 CreatedAt = now
                             };
                             dbContext.NotificationAlerts.Add(alert);
 
                             // We log a generic status "reminded" to avoid double notification in same minute
-                            schedule.AdherenceLogs.Add(new MedicationAdherenceLog
+                            var reminderLog = new MedicationAdherenceLog
                             {
-                                Date = now,
-                                Status = "reminded"
-                            });
+                                MedicationScheduleId = schedule.Id,
+                                Date = todayStr,
+                                Status = AdherenceStatus.Reminded
+                            };
+                            dbContext.MedicationAdherenceLogs.Add(reminderLog);
 
                             _logger.LogInformation("Sent med reminder for {MedName} to {Email}", schedule.MedName, user.Email);
                         }

@@ -4,8 +4,10 @@ using MomOi.API.Data;
 using MomOi.API.DTOs;
 using MomOi.API.DTOs.Admin;
 using MomOi.API.DTOs.Auth;
+using MomOi.API.Models;
 using MomOi.API.Models.Health;
 using MomOi.API.Models.Identity;
+using MomOi.API.Repositories;
 using MomOi.API.Services.Integration;
 using System;
 using System.Linq;
@@ -204,16 +206,13 @@ namespace MomOi.API.Services.Admin
 
         public async Task<ApiResponse<object>> GetReportsSummaryAsync()
         {
-            var stressGroups = await _context.LifestyleEntries
-                .GroupBy(e => e.StressLevel)
-                .Select(g => new { StressLevel = g.Key, Count = g.Count() })
-                .ToListAsync();
+            var lifestyle = await _context.LifestyleEntries.ToListAsync();
 
             var stressDist = new
             {
-                Low = stressGroups.FirstOrDefault(g => g.StressLevel == "Low")?.Count ?? 0,
-                Moderate = stressGroups.FirstOrDefault(g => g.StressLevel == "Moderate")?.Count ?? 0,
-                High = stressGroups.FirstOrDefault(g => g.StressLevel == "High")?.Count ?? 0
+                StressLow = lifestyle.Count(l => l.StressLevel == StressLevel.Low),
+                StressModerate = lifestyle.Count(l => l.StressLevel == StressLevel.Moderate),
+                StressHigh = lifestyle.Count(l => l.StressLevel == StressLevel.High)
             };
 
             var scoreTrend = await _context.LifestyleEntries

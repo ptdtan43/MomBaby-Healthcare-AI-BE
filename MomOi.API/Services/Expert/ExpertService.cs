@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using MomOi.API.Data;
 using MomOi.API.DTOs;
 using MomOi.API.DTOs.Expert;
+using MomOi.API.Models;
 using MomOi.API.Models.Health;
 using MomOi.API.Models.Identity;
 using System;
@@ -39,7 +40,7 @@ namespace MomOi.API.Services.Expert
                     r.Protein,
                     r.Carbs,
                     r.Fat,
-                    r.PrepTime,
+                    r.PrepTimeMinutes,
                     r.Difficulty,
                     r.Tags,
                     r.IngredientsJson,
@@ -124,7 +125,7 @@ namespace MomOi.API.Services.Expert
             var message = new ChatMessage
             {
                 ChatSessionId = session.Id,
-                Sender = $"expert_{expertId}",
+                Sender = SenderType.Expert,
                 Text = dto.Message,
                 Timestamp = DateTime.UtcNow
             };

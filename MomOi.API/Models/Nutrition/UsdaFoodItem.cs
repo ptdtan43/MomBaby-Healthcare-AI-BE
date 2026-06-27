@@ -6,10 +6,8 @@ namespace MomOi.API.Models.Nutrition
     /// Represents a nutritional food item synced from the USDA FoodData Central API.
     /// Used by experts/AI to fetch accurate nutrition data.
     /// </summary>
-    public class UsdaFoodItem
+    public class UsdaFoodItem : BaseEntity
     {
-        public int Id { get; set; }
-
         /// <summary>FoodData Central ID</summary>
         public int FdcId { get; set; }
 
@@ -28,6 +26,6 @@ namespace MomOi.API.Models.Nutrition
         /// <summary>Total Fat (g) per 100g</summary>
         public float Fat { get; set; }
 
-        public DateTime SyncDate { get; set; } = DateTime.UtcNow;
+        public System.DateTime SyncDate { get; set; } = System.DateTime.UtcNow;
     }
 }

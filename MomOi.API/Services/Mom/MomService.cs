@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using MomOi.API.Data;
 using MomOi.API.DTOs;
 using MomOi.API.DTOs.Mom;
+using MomOi.API.Models;
 using MomOi.API.Models.Health;
 using MomOi.API.Models.Identity;
 using MomOi.API.Models.Nutrition;
@@ -40,7 +41,7 @@ namespace MomOi.API.Services.Mom
                 {
                     Id = a.Id,
                     Allergen = a.Allergen,
-                    Severity = a.Severity,
+                    Severity = a.Severity.ToString(),
                     Symptoms = a.Symptoms
                 })
                 .ToListAsync();
@@ -54,7 +55,7 @@ namespace MomOi.API.Services.Mom
             {
                 UserId = userId,
                 Allergen = dto.Allergen,
-                Severity = dto.Severity,
+                Severity = Enum.TryParse<AllergySeverity>(dto.Severity, true, out var pSev) ? pSev : AllergySeverity.Mild,
                 Symptoms = dto.Symptoms
             };
 
@@ -65,7 +66,7 @@ namespace MomOi.API.Services.Mom
             {
                 Id = allergy.Id,
                 Allergen = allergy.Allergen,
-                Severity = allergy.Severity,
+                Severity = allergy.Severity.ToString(),
                 Symptoms = allergy.Symptoms
             };
 
@@ -124,7 +125,7 @@ namespace MomOi.API.Services.Mom
                 UserId = userId,
                 WeekNumber = dto.WeekNumber,
                 DailyMealsJson = dto.DailyMealsJson,
-                GeneratedFrom = "manual",
+                GeneratedFrom = DietPlanSource.Manual,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -197,7 +198,7 @@ YÊU CẦU ĐẦU RA (Chỉ trả về chuỗi JSON Array nguyên bản, KHÔNG 
                 UserId = userId,
                 WeekNumber = dto.WeekNumber,
                 DailyMealsJson = aiResponseJson,
-                GeneratedFrom = "ai-generated",
+                GeneratedFrom = DietPlanSource.AiGenerated,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };

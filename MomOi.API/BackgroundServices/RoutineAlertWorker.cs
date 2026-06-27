@@ -64,7 +64,7 @@ namespace MomOi.API.BackgroundServices
                 {
                     UserId = user.Id,
                     Type = NotificationAlertType.RoutineCheck,
-                    Severity = 50,
+                    Severity = AlertSeverity.Info,
                     Message = "Đã đến giờ kiểm tra sức khỏe định kỳ. Hãy dành vài phút cập nhật tình trạng hiện tại của bạn nhé!",
                     Channels = new[] { "app" },
                     Status = NotificationStatus.Pending,

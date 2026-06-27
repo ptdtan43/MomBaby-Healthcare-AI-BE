@@ -1,4 +1,4 @@
-using System;
+using MomOi.API.Models.Identity;
 
 namespace MomOi.API.Models.Health
 {
@@ -6,11 +6,10 @@ namespace MomOi.API.Models.Health
     /// A saved or AI-generated diet plan for a user for a specific pregnancy week.
     /// Maps from MongoDB DietPlan schema (with nested dailyMeals flattened to JSON).
     /// </summary>
-    public class DietPlan
+    public class DietPlan : BaseEntity
     {
-        public int Id { get; set; }
-
         public string UserId { get; set; } = string.Empty;
+        public AppUser User { get; set; } = null!;
 
         public int? WeekNumber { get; set; }
 
@@ -21,12 +20,9 @@ namespace MomOi.API.Models.Health
         /// </summary>
         public string DailyMealsJson { get; set; } = "[]";
 
-        /// <summary>"manual", "ai-generated", "nutrition-api"</summary>
-        public string GeneratedFrom { get; set; } = "manual";
+        /// <summary>Source of generation</summary>
+        public DietPlanSource GeneratedFrom { get; set; } = DietPlanSource.Manual;
 
         public DateTime? MonitoringDate { get; set; }
-
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     }
 }

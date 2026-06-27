@@ -1,21 +1,18 @@
-using System;
+using System.ComponentModel.DataAnnotations.Schema;
+using MomOi.API.Models.Identity;
 
 namespace MomOi.API.Models.Health
 {
     /// <summary>
     /// Represents a weekly log recorded by a mother during her pregnancy.
     /// </summary>
-    public class PregnancyLog
+    public class PregnancyLog : BaseEntity
     {
-        /// <summary>
-        /// Unique primary key.
-        /// </summary>
-        public int Id { get; set; }
-
         /// <summary>
         /// Foreign key to AppUser (linked by UserId).
         /// </summary>
         public string UserId { get; set; } = string.Empty;
+        public AppUser User { get; set; } = null!;
 
         /// <summary>
         /// Pregnancy week of the log (1 to 42).

@@ -1,4 +1,5 @@
 using MomOi.API.DTOs;
+using MomOi.API.Models;
 using MomOi.API.Models.Health;
 using MomOi.API.Repositories;
 using MomOi.API.Services.BusinessRules;
@@ -61,9 +62,9 @@ namespace MomOi.API.Services.Baby
             await _babyRepo.SaveChangesAsync();
 
             var evaluation = _businessRuleEngine.VerifyBabyGrowth(
-                baby.AgeMonths,
-                baby.Gender,
-                record.WeightKg,
+                (int)((DateTime.UtcNow - baby.DateOfBirth).TotalDays / 30),
+                baby.Gender.ToString(),
+                baby.CurrentWeightKg ?? 0f,
                 record.HeightCm
             );
 

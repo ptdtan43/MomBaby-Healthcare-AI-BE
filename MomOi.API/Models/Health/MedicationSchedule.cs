@@ -1,5 +1,5 @@
-using System;
 using System.Collections.Generic;
+using MomOi.API.Models.Identity;
 
 namespace MomOi.API.Models.Health
 {
@@ -7,11 +7,10 @@ namespace MomOi.API.Models.Health
     /// A single medication reminder schedule for a user.
     /// Maps from MongoDB MedSchedule schema (including nested AdherenceLog).
     /// </summary>
-    public class MedicationSchedule
+    public class MedicationSchedule : BaseEntity
     {
-        public int Id { get; set; }
-
         public string UserId { get; set; } = string.Empty;
+        public AppUser User { get; set; } = null!;
 
         /// <summary>Name of the medication (e.g. "Axit Folic 400mcg").</summary>
         public string MedName { get; set; } = string.Empty;
@@ -27,9 +26,6 @@ namespace MomOi.API.Models.Health
 
         public string? Notes { get; set; }
 
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
-
         // Navigation property to adherence records
         public ICollection<MedicationAdherenceLog> AdherenceLogs { get; set; }
             = new List<MedicationAdherenceLog>();
@@ -38,16 +34,14 @@ namespace MomOi.API.Models.Health
     /// <summary>
     /// Records whether a medication dose was taken or skipped on a given date.
     /// </summary>
-    public class MedicationAdherenceLog
+    public class MedicationAdherenceLog : BaseEntity
     {
-        public int Id { get; set; }
-
         public int MedicationScheduleId { get; set; }
 
         public DateTime Date { get; set; }
 
-        /// <summary>"taken" or "skipped"</summary>
-        public string Status { get; set; } = "taken";
+        /// <summary>Taken or Skipped</summary>
+        public AdherenceStatus Status { get; set; } = AdherenceStatus.Taken;
 
         // Navigation property
         public MedicationSchedule Schedule { get; set; } = null!;

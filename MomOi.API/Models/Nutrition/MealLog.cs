@@ -1,21 +1,19 @@
 using System;
+using System.Collections.Generic;
+using MomOi.API.Models.Identity;
 
 namespace MomOi.API.Models.Nutrition
 {
     /// <summary>
     /// Represents a meal logged by a user for nutritional tracking.
     /// </summary>
-    public class MealLog
+    public class MealLog : BaseEntity
     {
-        /// <summary>
-        /// Unique primary key.
-        /// </summary>
-        public int Id { get; set; }
-
         /// <summary>
         /// Foreign key to AppUser (linked by UserId).
         /// </summary>
         public string UserId { get; set; } = string.Empty;
+        public AppUser User { get; set; } = null!;
 
         /// <summary>
         /// Time when the meal was logged.
@@ -23,9 +21,9 @@ namespace MomOi.API.Models.Nutrition
         public DateTime LoggedAt { get; set; } = DateTime.UtcNow;
 
         /// <summary>
-        /// Type of meal (e.g. "Breakfast", "Lunch", "Dinner", "Snack").
+        /// Type of meal.
         /// </summary>
-        public string MealType { get; set; } = string.Empty;
+        public MealType MealType { get; set; }
 
         /// <summary>
         /// List of foods consumed, stored as a JSON string list in the database.

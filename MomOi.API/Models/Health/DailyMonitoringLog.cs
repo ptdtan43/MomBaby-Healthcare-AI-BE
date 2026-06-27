@@ -1,4 +1,4 @@
-using System;
+using MomOi.API.Models.Identity;
 
 namespace MomOi.API.Models.Health
 {
@@ -6,11 +6,10 @@ namespace MomOi.API.Models.Health
     /// Daily health monitoring log capturing vitals, mood, sleep, meals, and baby metrics.
     /// Maps from MongoDB DailyMonitoring schema.
     /// </summary>
-    public class DailyMonitoringLog
+    public class DailyMonitoringLog : BaseEntity
     {
-        public int Id { get; set; }
-
         public string UserId { get; set; } = string.Empty;
+        public AppUser User { get; set; } = null!;
 
         public DateTime Date { get; set; }
 
@@ -49,8 +48,5 @@ namespace MomOi.API.Models.Health
         public int ConceptionDayOfCycle { get; set; } = 0;
         public bool AllergySymptomLogged { get; set; } = false;
         public string NewFoodLogged { get; set; } = string.Empty;
-
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     }
 }

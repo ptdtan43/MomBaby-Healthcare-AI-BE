@@ -17,13 +17,8 @@ namespace MomOi.API.Models.Health
     /// <summary>
     /// Stores health metrics only. Separated from user PII tables (Decree 13/2023/ND-CP compliance).
     /// </summary>
-    public class MomHealthProfile
+    public class MomHealthProfile : BaseEntity
     {
-        /// <summary>
-        /// Unique primary key for health profile.
-        /// </summary>
-        public int Id { get; set; }
-
         /// <summary>
         /// Foreign key reference to AppUser.
         /// </summary>
@@ -83,11 +78,6 @@ namespace MomOi.API.Models.Health
         /// Indicates if the mother is currently breastfeeding.
         /// </summary>
         public bool IsBreastfeeding { get; set; }
-
-        /// <summary>
-        /// Time of last metrics update.
-        /// </summary>
-        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
         /// <summary>
         /// Navigation collection for menstrual cycle logs.

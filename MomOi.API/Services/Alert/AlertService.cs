@@ -40,8 +40,8 @@ namespace MomOi.API.Services.Alert
             var alert = new NotificationAlert
             {
                 UserId = userId,
-                Type = request.Type,
-                Severity = request.Severity,
+                Type = NotificationAlertType.Symptom,
+                Severity = AlertSeverity.Medium,
                 Message = request.Message,
                 Channels = request.Channels,
                 Status = NotificationStatus.Pending,

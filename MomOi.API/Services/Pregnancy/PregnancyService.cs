@@ -1,4 +1,5 @@
 using MomOi.API.DTOs;
+using MomOi.API.Models;
 using MomOi.API.Models.Health;
 using MomOi.API.Models.Nutrition;
 using MomOi.API.Repositories;
@@ -105,7 +106,7 @@ namespace MomOi.API.Services.Pregnancy
             {
                 UserId = userId,
                 LoggedAt = DateTime.UtcNow,
-                MealType = "Snack",
+                MealType = MealType.Snack,
                 FoodItems = foods,
                 Calories = 250f
             };

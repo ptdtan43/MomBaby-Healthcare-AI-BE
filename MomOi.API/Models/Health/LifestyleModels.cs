@@ -1,3 +1,4 @@
+using MomOi.API.Models.Identity;
 using System;
 
 namespace MomOi.API.Models.Health
@@ -15,11 +16,10 @@ namespace MomOi.API.Models.Health
     /// A lifestyle or daily monitoring alert triggered by the Business Rule Engine.
     /// Maps from MongoDB LifestyleAlert schema.
     /// </summary>
-    public class LifestyleAlert
+    public class LifestyleAlert : BaseEntity
     {
-        public int Id { get; set; }
-
         public string UserId { get; set; } = string.Empty;
+        public AppUser User { get; set; } = null!;
 
         /// <summary>Optional FK to the DailyMonitoringLog that triggered this alert.</summary>
         public int? DailyMonitoringLogId { get; set; }
@@ -38,40 +38,30 @@ namespace MomOi.API.Models.Health
         public DateTime TriggeredAt { get; set; } = DateTime.UtcNow;
 
         public AlertStatus Status { get; set; } = AlertStatus.Pending;
-
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     }
 
     /// <summary>
     /// A daily lifestyle tracking entry for health scoring and profile classification.
     /// Maps from MongoDB LifestyleEntry schema.
     /// </summary>
-    public class LifestyleEntry
+    public class LifestyleEntry : BaseEntity
     {
-        public int Id { get; set; }
-
         public string UserId { get; set; } = string.Empty;
+        public AppUser User { get; set; } = null!;
 
         public DateTime Date { get; set; }
 
-        public float StudyHours { get; set; } = 0;
+        public float SelfCareHours { get; set; } = 0;
         public float SleepHours { get; set; } = 0;
         public float PhysicalHours { get; set; } = 0;
         public float SocialHours { get; set; } = 0;
-        public float ExtracurricularHours { get; set; } = 0;
-        public float Gpa { get; set; } = 0;
+        public float WaterLiters { get; set; } = 0;
 
-        /// <summary>"Low", "Moderate", or "High"</summary>
-        public string StressLevel { get; set; } = "Low";
+        public StressLevel StressLevel { get; set; } = StressLevel.Low;
 
         /// <summary>Composite health score from 0 to 100.</summary>
         public int HealthScore { get; set; }
 
-        /// <summary>"Burned Out", "Couch Scholar", "Balanced", "Overachiever", "Unknown"</summary>
-        public string LifestyleProfile { get; set; } = "Unknown";
-
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+        public MaternalLifestyleProfile LifestyleProfile { get; set; } = MaternalLifestyleProfile.Unknown;
     }
 }

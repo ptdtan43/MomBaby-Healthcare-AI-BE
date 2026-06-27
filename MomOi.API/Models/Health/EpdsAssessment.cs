@@ -6,13 +6,8 @@ namespace MomOi.API.Models.Health
     /// <summary>
     /// Represents an Edinburgh Postnatal Depression Scale (EPDS) screening assessment.
     /// </summary>
-    public class EpdsAssessment
+    public class EpdsAssessment : BaseEntity
     {
-        /// <summary>
-        /// Unique primary key.
-        /// </summary>
-        public int Id { get; set; }
-
         /// <summary>
         /// Foreign key reference to MomHealthProfile.
         /// </summary>

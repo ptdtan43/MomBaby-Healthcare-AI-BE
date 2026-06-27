@@ -6,13 +6,8 @@ namespace MomOi.API.Models.Health
     /// <summary>
     /// Represents a child profile linked to a mother.
     /// </summary>
-    public class BabyProfile
+    public class BabyProfile : BaseEntity
     {
-        /// <summary>
-        /// Unique primary key for baby profile.
-        /// </summary>
-        public int Id { get; set; }
-
         /// <summary>
         /// Reference to the AppUser ID of the mother.
         /// </summary>
@@ -29,9 +24,9 @@ namespace MomOi.API.Models.Health
         public DateTime DateOfBirth { get; set; }
 
         /// <summary>
-        /// Gender of the baby ("male" or "female").
+        /// Gender of the baby.
         /// </summary>
-        public string Gender { get; set; } = string.Empty;
+        public Gender Gender { get; set; }
 
         /// <summary>
         /// Current weight of the baby in kilograms.
