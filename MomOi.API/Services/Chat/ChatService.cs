@@ -1,10 +1,8 @@
-using Microsoft.EntityFrameworkCore;
-using MomOi.API.Data;
 using MomOi.API.DTOs;
 using MomOi.API.Models;
 using MomOi.API.Models.Health;
+using MomOi.API.Repositories;
 using MomOi.API.Services.AI;
-using MomOi.API.Services.Integration;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -13,12 +11,12 @@ namespace MomOi.API.Services.Chat
 {
     public class ChatService : IChatService
     {
-        private readonly AppDbContext _context;
+        private readonly IUnitOfWork _unitOfWork;
         private readonly IGeminiService _geminiService;
 
-        public ChatService(AppDbContext context, IGeminiService geminiService)
+        public ChatService(IUnitOfWork unitOfWork, IGeminiService geminiService)
         {
-            _context = context;
+            _unitOfWork = unitOfWork;
             _geminiService = geminiService;
         }
 
@@ -29,15 +27,13 @@ namespace MomOi.API.Services.Chat
                 return ApiResponse<object>.FailureResult("Tin nhắn không được để trống.");
             }
 
-            var profile = await _context.MomHealthProfiles
+            var profile = await _unitOfWork.Repository<MomHealthProfile>()
                 .FirstOrDefaultAsync(p => p.UserId == userId);
 
             var healthContext = BuildHealthContext(profile);
-
             var botReply = await _geminiService.SendChatMessageAsync(request.Text, healthContext);
 
-            var session = await _context.ChatSessions
-                .Include(s => s.Messages)
+            var session = await _unitOfWork.Repository<ChatSession>()
                 .FirstOrDefaultAsync(s => s.UserId == userId && s.SessionId == request.SessionId);
 
             if (session == null)
@@ -49,18 +45,18 @@ namespace MomOi.API.Services.Chat
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
                 };
-                _context.ChatSessions.Add(session);
-                await _context.SaveChangesAsync();
+                await _unitOfWork.Repository<ChatSession>().AddAsync(session);
+                await _unitOfWork.SaveChangesAsync();
             }
 
-            _context.ChatMessages.Add(new ChatMessage
+            await _unitOfWork.Repository<ChatMessage>().AddAsync(new ChatMessage
             {
                 ChatSessionId = session.Id,
                 Sender = SenderType.User,
                 Text = request.Text,
                 Timestamp = DateTime.UtcNow
             });
-            _context.ChatMessages.Add(new ChatMessage
+            await _unitOfWork.Repository<ChatMessage>().AddAsync(new ChatMessage
             {
                 ChatSessionId = session.Id,
                 Sender = SenderType.Bot,
@@ -69,15 +65,14 @@ namespace MomOi.API.Services.Chat
             });
 
             session.UpdatedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
 
             return ApiResponse<object>.SuccessResult(new { reply = botReply });
         }
 
         public async Task<ApiResponse<object>> GetChatHistoryAsync(string userId, string? sessionId, int limit = 50)
         {
-            var session = await _context.ChatSessions
-                .Include(s => s.Messages)
+            var session = await _unitOfWork.Repository<ChatSession>()
                 .FirstOrDefaultAsync(s => s.UserId == userId && s.SessionId == sessionId);
 
             if (session == null)
@@ -85,7 +80,10 @@ namespace MomOi.API.Services.Chat
                 return ApiResponse<object>.SuccessResult(new { messages = Array.Empty<object>() });
             }
 
-            var messages = session.Messages
+            var allMessages = await _unitOfWork.Repository<ChatMessage>()
+                .FindAsync(m => m.ChatSessionId == session.Id);
+
+            var messages = allMessages
                 .OrderBy(m => m.Timestamp)
                 .TakeLast(limit)
                 .Select(m => new
@@ -100,14 +98,15 @@ namespace MomOi.API.Services.Chat
 
         public async Task<ApiResponse<object>> ClearSessionAsync(string userId, string? sessionId)
         {
-            var session = await _context.ChatSessions
-                .Include(s => s.Messages)
+            var session = await _unitOfWork.Repository<ChatSession>()
                 .FirstOrDefaultAsync(s => s.UserId == userId && s.SessionId == sessionId);
 
             if (session != null)
             {
-                _context.ChatMessages.RemoveRange(session.Messages);
-                await _context.SaveChangesAsync();
+                var messages = await _unitOfWork.Repository<ChatMessage>()
+                    .FindAsync(m => m.ChatSessionId == session.Id);
+                _unitOfWork.Repository<ChatMessage>().RemoveRange(messages);
+                await _unitOfWork.SaveChangesAsync();
             }
 
             return ApiResponse<object>.SuccessResult(null!, "Đã xoá lịch sử chat thành công.");

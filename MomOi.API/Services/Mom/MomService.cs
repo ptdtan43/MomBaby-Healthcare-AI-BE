@@ -1,12 +1,11 @@
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
-using MomOi.API.Data;
 using MomOi.API.DTOs;
 using MomOi.API.DTOs.Mom;
 using MomOi.API.Models;
 using MomOi.API.Models.Health;
 using MomOi.API.Models.Identity;
 using MomOi.API.Models.Nutrition;
+using MomOi.API.Repositories;
 using MomOi.API.Services.AI;
 using System;
 using System.Linq;
@@ -17,16 +16,17 @@ namespace MomOi.API.Services.Mom
 {
     public class MomService : IMomService
     {
-        private readonly AppDbContext _context;
+        private readonly IUnitOfWork _unitOfWork;
+        // UserManager là đặc thù của ASP.NET Identity, không thể thay bằng Repository
         private readonly UserManager<AppUser> _userManager;
         private readonly IGeminiService _geminiService;
 
         public MomService(
-            AppDbContext context,
+            IUnitOfWork unitOfWork,
             UserManager<AppUser> userManager,
             IGeminiService geminiService)
         {
-            _context = context;
+            _unitOfWork = unitOfWork;
             _userManager = userManager;
             _geminiService = geminiService;
         }
@@ -35,18 +35,18 @@ namespace MomOi.API.Services.Mom
 
         public async Task<ApiResponse<object>> GetAllergiesAsync(string userId)
         {
-            var allergies = await _context.FoodAllergyRecords
-                .Where(a => a.UserId == userId)
-                .Select(a => new AllergyResponseDto
-                {
-                    Id = a.Id,
-                    Allergen = a.Allergen,
-                    Severity = a.Severity.ToString(),
-                    Symptoms = a.Symptoms
-                })
-                .ToListAsync();
+            var allergies = await _unitOfWork.Repository<FoodAllergyRecord>()
+                .FindAsync(a => a.UserId == userId);
 
-            return ApiResponse<object>.SuccessResult(allergies, "Lấy danh sách dị ứng thành công.");
+            var result = allergies.Select(a => new AllergyResponseDto
+            {
+                Id = a.Id,
+                Allergen = a.Allergen,
+                Severity = a.Severity.ToString(),
+                Symptoms = a.Symptoms
+            }).ToList();
+
+            return ApiResponse<object>.SuccessResult(result, "Lấy danh sách dị ứng thành công.");
         }
 
         public async Task<ApiResponse<object>> AddAllergyAsync(string userId, CreateAllergyDto dto)
@@ -59,8 +59,8 @@ namespace MomOi.API.Services.Mom
                 Symptoms = dto.Symptoms
             };
 
-            _context.FoodAllergyRecords.Add(allergy);
-            await _context.SaveChangesAsync();
+            await _unitOfWork.Repository<FoodAllergyRecord>().AddAsync(allergy);
+            await _unitOfWork.SaveChangesAsync();
 
             var responseDto = new AllergyResponseDto
             {
@@ -75,7 +75,7 @@ namespace MomOi.API.Services.Mom
 
         public async Task<ApiResponse<object>> RemoveAllergyAsync(string userId, int allergyId)
         {
-            var allergy = await _context.FoodAllergyRecords
+            var allergy = await _unitOfWork.Repository<FoodAllergyRecord>()
                 .FirstOrDefaultAsync(a => a.Id == allergyId && a.UserId == userId);
 
             if (allergy == null)
@@ -83,8 +83,8 @@ namespace MomOi.API.Services.Mom
                 return ApiResponse<object>.FailureResult("Không tìm thấy thông tin dị ứng này.");
             }
 
-            _context.FoodAllergyRecords.Remove(allergy);
-            await _context.SaveChangesAsync();
+            _unitOfWork.Repository<FoodAllergyRecord>().Remove(allergy);
+            await _unitOfWork.SaveChangesAsync();
 
             return ApiResponse<object>.SuccessResult((object)"OK", "Đã xóa thông tin dị ứng.");
         }
@@ -93,27 +93,17 @@ namespace MomOi.API.Services.Mom
 
         public async Task<ApiResponse<object>> GetDietPlansAsync(string userId)
         {
-            var plansFromDb = await _context.DietPlans
-                .Where(d => d.UserId == userId)
-                .OrderByDescending(d => d.CreatedAt)
+            var plansFromDb = await _unitOfWork.Repository<DietPlan>()
+                .FindAsync(d => d.UserId == userId);
+
+            var plans = plansFromDb.OrderByDescending(d => d.CreatedAt)
                 .Select(d => new
                 {
-                    d.Id,
-                    d.WeekNumber,
-                    d.GeneratedFrom,
-                    d.CreatedAt,
-                    d.DailyMealsJson
-                })
-                .ToListAsync();
-
-            var plans = plansFromDb.Select(d => new
-            {
-                d.Id,
-                d.WeekNumber,
-                d.GeneratedFrom,
-                d.CreatedAt,
-                DailyMeals = string.IsNullOrWhiteSpace(d.DailyMealsJson) ? (object?)null : JsonDocument.Parse(d.DailyMealsJson).RootElement
-            }).ToList();
+                    d.Id, d.WeekNumber, d.GeneratedFrom, d.CreatedAt,
+                    DailyMeals = string.IsNullOrWhiteSpace(d.DailyMealsJson)
+                        ? (object?)null
+                        : JsonDocument.Parse(d.DailyMealsJson).RootElement
+                }).ToList();
 
             return ApiResponse<object>.SuccessResult(plans, "Lấy danh sách thực đơn thành công.");
         }
@@ -130,8 +120,8 @@ namespace MomOi.API.Services.Mom
                 UpdatedAt = DateTime.UtcNow
             };
 
-            _context.DietPlans.Add(plan);
-            await _context.SaveChangesAsync();
+            await _unitOfWork.Repository<DietPlan>().AddAsync(plan);
+            await _unitOfWork.SaveChangesAsync();
 
             return ApiResponse<object>.SuccessResult((object)plan.Id, "Tạo thực đơn thủ công thành công.");
         }
@@ -139,13 +129,12 @@ namespace MomOi.API.Services.Mom
         public async Task<ApiResponse<object>> GenerateAIDietPlanAsync(string userId, GenerateDietPlanDto dto)
         {
             // 1. Get user allergies to include in the AI prompt
-            var allergies = await _context.FoodAllergyRecords
-                .Where(a => a.UserId == userId)
-                .Select(a => a.Allergen)
-                .ToListAsync();
+            var allergyRecords = await _unitOfWork.Repository<FoodAllergyRecord>()
+                .FindAsync(a => a.UserId == userId);
+            var allergies = allergyRecords.Select(a => a.Allergen).ToList();
 
-            string allergyContext = allergies.Any() 
-                ? $"Trẻ bị dị ứng với: {string.Join(", ", allergies)}. TUYỆT ĐỐI KHÔNG ĐƯA CÁC MÓN NÀY VÀO THỰC ĐƠN." 
+            string allergyContext = allergies.Any()
+                ? $"Trẻ bị dị ứng với: {string.Join(", ", allergies)}. TUYỆT ĐỐI KHÔNG ĐƯA CÁC MÓN NÀY VÀO THỰC ĐƠN."
                 : "Trẻ không có dị ứng thức ăn nào.";
 
             string prompt = $@"
@@ -166,21 +155,16 @@ YÊU CẦU ĐẦU RA (Chỉ trả về chuỗi JSON Array nguyên bản, KHÔNG 
     ]
   }}
 ]";
-            
+
             string aiResponseJson = "";
             try
             {
                 aiResponseJson = await _geminiService.SendChatMessageAsync(prompt, "Bạn là chuyên gia dinh dưỡng nhi khoa hàng đầu.");
-                
-                // Clean up potential markdown formatting from Gemini response
                 aiResponseJson = aiResponseJson.Replace("```json", "").Replace("```", "").Trim();
-                
-                // Validate if it's actual JSON
                 var jsonDoc = JsonDocument.Parse(aiResponseJson);
             }
             catch (Exception)
             {
-                // Fallback to static mock JSON if Gemini fails or API key is not configured
                 aiResponseJson = @"[
                   {
                     ""day"": ""Ngày 1"",
@@ -203,8 +187,8 @@ YÊU CẦU ĐẦU RA (Chỉ trả về chuỗi JSON Array nguyên bản, KHÔNG 
                 UpdatedAt = DateTime.UtcNow
             };
 
-            _context.DietPlans.Add(plan);
-            await _context.SaveChangesAsync();
+            await _unitOfWork.Repository<DietPlan>().AddAsync(plan);
+            await _unitOfWork.SaveChangesAsync();
 
             return ApiResponse<object>.SuccessResult((object)plan.Id, "Đã tạo thực đơn bằng AI (hoặc dự phòng) thành công.");
         }
@@ -219,13 +203,11 @@ YÊU CẦU ĐẦU RA (Chỉ trả về chuỗi JSON Array nguyên bản, KHÔNG 
                 return ApiResponse<object>.FailureResult("Không tìm thấy người dùng.");
             }
 
-            // Mocking payment verification...
             if (string.IsNullOrWhiteSpace(dto.TransactionId))
             {
                 return ApiResponse<object>.FailureResult("Thiếu mã giao dịch thanh toán.");
             }
 
-            // Update Tier
             user.Tier = SubscriptionTier.SuperMomVip;
             user.TierExpiresAt = DateTime.UtcNow.AddMonths(dto.MonthsToUpgrade);
 
@@ -235,9 +217,10 @@ YÊU CẦU ĐẦU RA (Chỉ trả về chuỗi JSON Array nguyên bản, KHÔNG 
                 return ApiResponse<object>.FailureResult("Lỗi khi cập nhật tài khoản.");
             }
 
-            return ApiResponse<object>.SuccessResult((object)new { 
-                user.Tier, 
-                user.TierExpiresAt 
+            return ApiResponse<object>.SuccessResult((object)new
+            {
+                user.Tier,
+                user.TierExpiresAt
             }, "Nâng cấp lên SuperMom VIP thành công.");
         }
     }

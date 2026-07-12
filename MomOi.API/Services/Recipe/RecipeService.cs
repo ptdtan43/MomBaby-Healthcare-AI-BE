@@ -1,6 +1,6 @@
-using Microsoft.EntityFrameworkCore;
-using MomOi.API.Data;
 using MomOi.API.DTOs;
+using MomOi.API.Models.Health;
+using MomOi.API.Repositories;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -9,28 +9,24 @@ namespace MomOi.API.Services.Recipe
 {
     public class RecipeService : IRecipeService
     {
-        private readonly AppDbContext _context;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public RecipeService(AppDbContext context)
+        public RecipeService(IUnitOfWork unitOfWork)
         {
-            _context = context;
+            _unitOfWork = unitOfWork;
         }
 
         public async Task<ApiResponse<object>> GetMyRecipesAsync(string userId, bool? isSaved, int page = 1, int limit = 20)
         {
-            var query = _context.Recipes.Where(r => r.UserId == userId);
+            var all = await _unitOfWork.Repository<MomOi.API.Models.Health.Recipe>()
+                .FindAsync(r => r.UserId == userId && (!isSaved.HasValue || r.IsSaved == isSaved.Value));
 
-            if (isSaved.HasValue)
-            {
-                query = query.Where(r => r.IsSaved == isSaved.Value);
-            }
-
-            var total = await query.CountAsync();
-            var recipes = await query
+            var total = all.Count();
+            var recipes = all
                 .OrderByDescending(r => r.CreatedAt)
                 .Skip((page - 1) * limit)
                 .Take(limit)
-                .ToListAsync();
+                .ToList();
 
             return ApiResponse<object>.SuccessResult(new
             {
@@ -43,7 +39,8 @@ namespace MomOi.API.Services.Recipe
 
         public async Task<ApiResponse<object>> GetRecipeAsync(string userId, int recipeId)
         {
-            var recipe = await _context.Recipes.FirstOrDefaultAsync(r => r.Id == recipeId && r.UserId == userId);
+            var recipe = await _unitOfWork.Repository<MomOi.API.Models.Health.Recipe>()
+                .FirstOrDefaultAsync(r => r.Id == recipeId && r.UserId == userId);
             if (recipe == null) return ApiResponse<object>.FailureResult("Không tìm thấy công thức nấu ăn này.");
 
             return ApiResponse<object>.SuccessResult(recipe, "Lấy thông tin chi tiết món ăn thành công.");
@@ -51,13 +48,14 @@ namespace MomOi.API.Services.Recipe
 
         public async Task<ApiResponse<object>> ToggleSaveRecipeAsync(string userId, int recipeId)
         {
-            var recipe = await _context.Recipes.FirstOrDefaultAsync(r => r.Id == recipeId && r.UserId == userId);
+            var recipe = await _unitOfWork.Repository<MomOi.API.Models.Health.Recipe>()
+                .FirstOrDefaultAsync(r => r.Id == recipeId && r.UserId == userId);
             if (recipe == null) return ApiResponse<object>.FailureResult("Không tìm thấy công thức nấu ăn này.");
 
             recipe.IsSaved = !recipe.IsSaved;
             recipe.UpdatedAt = DateTime.UtcNow;
 
-            await _context.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
 
             var msg = recipe.IsSaved ? "Đã lưu món ăn vào sổ tay." : "Đã hủy lưu món ăn khỏi sổ tay.";
             return ApiResponse<object>.SuccessResult(new { isSaved = recipe.IsSaved }, msg);
@@ -65,7 +63,8 @@ namespace MomOi.API.Services.Recipe
 
         public async Task<ApiResponse<object>> GetCurrentProfileAsync(string userId)
         {
-            var healthProfile = await _context.MomHealthProfiles.FirstOrDefaultAsync(p => p.UserId == userId);
+            var healthProfile = await _unitOfWork.Repository<MomHealthProfile>()
+                .FirstOrDefaultAsync(p => p.UserId == userId);
             var stage = healthProfile?.Stage.ToString() ?? "Unknown";
 
             string description = stage switch

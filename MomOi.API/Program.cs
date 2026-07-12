@@ -1,233 +1,35 @@
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
-using Npgsql.EntityFrameworkCore.PostgreSQL;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
 using MomOi.API.Data;
+using MomOi.API.Extensions;
 using MomOi.API.Hubs;
 using MomOi.API.Middleware;
-using MomOi.API.Models.Identity;
-using MomOi.API.Services.AI;
-using MomOi.API.Services.Auth;
-using MomOi.API.Services.BusinessRules;
-using MomOi.API.Services.Notifications;
-using MomOi.API.Services.Nutrition;
-using MomOi.API.Services.Pregnancy;
-using MomOi.API.Services.Baby;
-using MomOi.API.Services.Fertility;
-using MomOi.API.Services.Postpartum;
-using MomOi.API.Services.DailyMonitoring;
-using MomOi.API.Services.Lifestyle;
-using MomOi.API.Services.Symptom;
-using MomOi.API.Services.Medication;
-using MomOi.API.Services.Diet;
-using MomOi.API.Services.Dashboard;
-using MomOi.API.Services.Chat;
-using MomOi.API.Services.Recipe;
-using MomOi.API.Services.Alert;
-using MomOi.API.Services.UserProfile;
-using MomOi.API.Services.Admin;
-using MomOi.API.Services.Expert;
-using MomOi.API.Services.Mom;
-using MomOi.API.Services.Integration;
-using MomOi.API.Services.Report;
-using MomOi.API.Services.AIFeatures;
-using MomOi.API.BackgroundServices;
-using MomOi.API.Repositories;
-using System;
-using System.IO;
-using System.Reflection;
-using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. DATABASE CONFIGURATION (Entity Framework Core + PostgreSQL)
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
-    ?? "Host=pgdb;Port=5432;Database=MomOiDb;Username=postgres;Password=postgres;";
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(connectionString, npgsqlOptions =>
-        npgsqlOptions.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(10), errorCodesToAdd: null))
-           .UseSnakeCaseNamingConvention());
+// ── SERVICE REGISTRATION ──────────────────────────────────────────────────────
+// Mỗi dòng tương ứng một nhóm cấu hình. Xem chi tiết trong Extensions/ServiceCollectionExtensions.cs
+builder.Services.AddDatabase(builder.Configuration);
+builder.Services.AddIdentityConfig();
+builder.Services.AddJwtAuthentication(builder.Configuration);
+builder.Services.AddApplicationServices();
+builder.Services.AddBackgroundWorkers();
+builder.Services.AddRateLimitingPolicy();
+builder.Services.AddCorsPolicy();
+builder.Services.AddSwaggerConfig();
 
-// 2. IDENTITY SYSTEM CONFIGURATION
-builder.Services.AddIdentity<AppUser, IdentityRole>(options =>
-{
-    options.Password.RequireDigit = false;
-    options.Password.RequiredLength = 6;
-    options.Password.RequireNonAlphanumeric = false;
-    options.Password.RequireUppercase = false;
-    options.Password.RequireLowercase = false;
-    options.User.RequireUniqueEmail = true;
-})
-.AddEntityFrameworkStores<AppDbContext>()
-.AddDefaultTokenProviders();
-
-// 3. JWT AUTHENTICATION SETUP (RS256 Asymmetric Cryptography)
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-})
-.AddJwtBearer(options =>
-{
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-        ValidIssuer = builder.Configuration["Jwt:Issuer"] ?? "MomOiAPI",
-        ValidAudience = builder.Configuration["Jwt:Audience"] ?? "MomOiFrontend",
-        IssuerSigningKey = RsaKeyHelper.GetValidationKey(builder.Configuration),
-        ClockSkew = TimeSpan.Zero
-    };
-});
-
-// 4. DEPENDENCY INJECTION FOR CUSTOM SERVICES
-builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
-builder.Services.AddScoped<IPregnancyService, PregnancyService>();
-builder.Services.AddScoped<IBabyService, BabyService>();
-builder.Services.AddScoped<IFertilityService, FertilityService>();
-builder.Services.AddScoped<IPostpartumService, PostpartumService>();
-builder.Services.AddScoped<IDailyMonitoringService, DailyMonitoringService>();
-builder.Services.AddScoped<ILifestyleService, LifestyleService>();
-builder.Services.AddScoped<ISymptomService, SymptomService>();
-builder.Services.AddScoped<IMedicationService, MedicationService>();
-builder.Services.AddScoped<IDietService, DietService>();
-builder.Services.AddScoped<IDashboardService, DashboardService>();
-builder.Services.AddScoped<IChatService, ChatService>();
-builder.Services.AddScoped<IRecipeService, RecipeService>();
-builder.Services.AddScoped<IAlertService, AlertService>();
-builder.Services.AddScoped<IUserProfileService, UserProfileService>();
-builder.Services.AddScoped<IAdminService, AdminService>();
-builder.Services.AddScoped<IExpertService, ExpertService>();
-builder.Services.AddScoped<IReportService, ReportService>();
-builder.Services.AddScoped<IAIFeatureService, AIFeatureService>();
-builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddScoped<IMomService, MomService>();
-builder.Services.AddScoped<IBusinessRuleEngine, BusinessRuleEngine>();
-builder.Services.AddHttpClient<IUsdaClientService, UsdaClientService>();
-builder.Services.AddSingleton<IEmailService, EmailService>();
-builder.Services.AddSingleton<ISmsService, SmsService>();
-builder.Services.AddSingleton<IPushNotificationService, PushNotificationService>();
-
-// HttpClient Factory injection for FastAPI client and Gemini API client
-builder.Services.AddHttpClient<NutritionProxyService>();
-builder.Services.AddHttpClient<IGeminiService, GeminiService>();
-
-// Register Background Workers
-builder.Services.AddHostedService<MedicationReminderWorker>();
-builder.Services.AddHostedService<RoutineAlertWorker>();
-builder.Services.AddHostedService<DailyMonitoringWorker>();
-builder.Services.AddHostedService<LifestyleReminderWorker>();
-
-// 5. GLOBAL RATE LIMITER (100 req/min per IP address)
-builder.Services.AddRateLimiter(options =>
-{
-    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? httpContext.Request.Headers.Host.ToString(),
-            factory: partition => new FixedWindowRateLimiterOptions
-            {
-                AutoReplenishment = true,
-                PermitLimit = 100,
-                QueueLimit = 0,
-                Window = TimeSpan.FromMinutes(1)
-            }));
-
-    options.OnRejected = async (context, token) =>
-    {
-        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
-        context.HttpContext.Response.ContentType = "application/json";
-        var rateLimitResponse = MomOi.API.DTOs.ApiResponse<object>.FailureResult("Tần suất yêu cầu quá nhanh. Vui lòng đợi 1 phút.");
-        await context.HttpContext.Response.WriteAsJsonAsync(rateLimitResponse, token);
-    };
-});
-
-// 6. CORS (Cross-Origin Resource Sharing)
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("CorsPolicy", policy =>
-    {
-        policy.WithOrigins("http://localhost:3000", "http://localhost:5173", "https://momoi.example.com")
-              .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials();
-    });
-});
-
-// 7. HEALTH CHECK ENDPOINT SERVICE
-builder.Services.AddHealthChecks()
-    .AddDbContextCheck<AppDbContext>();
-
-// 8. CONTROLLERS & SWAGGER CONFIGURATION (With Bearer Authentication support)
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
         options.JsonSerializerOptions.DictionaryKeyPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
     });
+
 builder.Services.AddSignalR();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
-{
-    c.SwaggerDoc("v1", new OpenApiInfo 
-    { 
-        Title = "MomOi API", 
-        Version = "v1",
-        Description = "Hệ thống Backend API cho ứng dụng chăm sóc mẹ và bé MomOi."
-    });
+builder.Services.AddHealthChecks().AddDbContextCheck<AppDbContext>();
 
-    // Configure Swagger to use JWT authorization
-    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-    {
-        Description = "Nhập JWT Token: 'Bearer {your_token}'",
-        Name = "Authorization",
-        In = ParameterLocation.Header,
-        Type = SecuritySchemeType.ApiKey,
-        Scheme = "Bearer"
-    });
-
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-            Array.Empty<string>()
-        }
-    });
-
-    // Include XML comments for API doc clarity
-    try
-    {
-        var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
-        var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-        c.IncludeXmlComments(xmlPath);
-    }
-    catch
-    {
-        // XML documentation missing, suppress warning
-    }
-});
-
+// ── HTTP PIPELINE ─────────────────────────────────────────────────────────────
 var app = builder.Build();
 
-// 9. HTTP REQUEST PIPELINE ORCHESTRATION
-
-// Global exception handler (standardizing error responses)
 app.UseMiddleware<ExceptionMiddleware>();
 
 if (app.Environment.IsDevelopment() || builder.Configuration["EnableSwagger"] == "true")
@@ -240,32 +42,18 @@ if (app.Environment.IsDevelopment() || builder.Configuration["EnableSwagger"] ==
     });
 }
 
-// Enable CORS
 app.UseCors("CorsPolicy");
-
-// Enable Rate Limiting
 app.UseRateLimiter();
-
-// Routing, authentication, and authorization pipeline
 app.UseRouting();
-
 app.UseAuthentication();
-
-// Subscription authorization check middleware (gates features by Tier attribute)
 app.UseMiddleware<SubscriptionTierMiddleware>();
-
 app.UseAuthorization();
 
-// Map Health check
 app.MapHealthChecks("/health");
-
-// Map SignalR Hubs
 app.MapHub<AlertHub>("/hubs/alerts");
-
-// Map API Controllers
 app.MapControllers();
 
-// Automatically execute DB migration on startup (facilitates Docker staging environment)
+// ── STARTUP TASKS ─────────────────────────────────────────────────────────────
 if (builder.Configuration["RunMigrationsOnStartup"] == "true")
 {
     using var scope = app.Services.CreateScope();
@@ -274,8 +62,7 @@ if (builder.Configuration["RunMigrationsOnStartup"] == "true")
     {
         dbContext.Database.Migrate();
         Console.WriteLine("Database migrations applied successfully.");
-        
-        // Seed default roles and admin users
+
         await MomOi.API.Data.DbInitializer.InitializeAsync(scope.ServiceProvider);
         Console.WriteLine("Default roles and users seeded successfully.");
     }

@@ -1,11 +1,10 @@
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
-using MomOi.API.Data;
 using MomOi.API.DTOs;
 using MomOi.API.DTOs.Expert;
 using MomOi.API.Models;
 using MomOi.API.Models.Health;
 using MomOi.API.Models.Identity;
+using MomOi.API.Repositories;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -14,12 +13,13 @@ namespace MomOi.API.Services.Expert
 {
     public class ExpertService : IExpertService
     {
-        private readonly AppDbContext _context;
+        private readonly IUnitOfWork _unitOfWork;
+        // UserManager là đặc thù của ASP.NET Identity, không thể thay bằng Repository
         private readonly UserManager<AppUser> _userManager;
 
-        public ExpertService(AppDbContext context, UserManager<AppUser> userManager)
+        public ExpertService(IUnitOfWork unitOfWork, UserManager<AppUser> userManager)
         {
-            _context = context;
+            _unitOfWork = unitOfWork;
             _userManager = userManager;
         }
 
@@ -27,28 +27,18 @@ namespace MomOi.API.Services.Expert
 
         public async Task<ApiResponse<object>> GetPendingRecipesAsync()
         {
-            var pending = await _context.Recipes
-                .Where(r => r.Status == RecipeStatus.PendingReview)
-                .OrderBy(r => r.GeneratedAt)
+            var allRecipes = await _unitOfWork.Repository<MomOi.API.Models.Health.Recipe>()
+                .FindAsync(r => r.Status == RecipeStatus.PendingReview);
+
+            var pending = allRecipes.OrderBy(r => r.GeneratedAt)
                 .Select(r => new
                 {
-                    r.Id,
-                    r.Title,
-                    r.Description,
-                    r.ProfileStage,
-                    r.Calories,
-                    r.Protein,
-                    r.Carbs,
-                    r.Fat,
-                    r.PrepTimeMinutes,
-                    r.Difficulty,
-                    r.Tags,
-                    r.IngredientsJson,
-                    r.StepsJson,
-                    r.Status,
-                    r.GeneratedAt
+                    r.Id, r.Title, r.Description, r.ProfileStage,
+                    r.Calories, r.Protein, r.Carbs, r.Fat,
+                    r.PrepTimeMinutes, r.Difficulty, r.Tags,
+                    r.IngredientsJson, r.StepsJson, r.Status, r.GeneratedAt
                 })
-                .ToListAsync();
+                .ToList();
 
             return ApiResponse<object>.SuccessResult(pending,
                 $"Có {pending.Count} công thức đang chờ xét duyệt.");
@@ -56,7 +46,8 @@ namespace MomOi.API.Services.Expert
 
         public async Task<ApiResponse<object>> ReviewRecipeAsync(int recipeId, string expertId, ReviewRecipeDto dto)
         {
-            var recipe = await _context.Recipes.FindAsync(recipeId);
+            var recipe = await _unitOfWork.Repository<MomOi.API.Models.Health.Recipe>()
+                .FirstOrDefaultAsync(r => r.Id == recipeId);
             if (recipe == null)
                 return ApiResponse<object>.FailureResult("Không tìm thấy công thức.");
 
@@ -72,7 +63,7 @@ namespace MomOi.API.Services.Expert
             recipe.ReviewedAt = DateTime.UtcNow;
             recipe.UpdatedAt = DateTime.UtcNow;
 
-            await _context.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
 
             var action = dto.IsApproved ? "Phê duyệt" : "Từ chối";
             return ApiResponse<object>.SuccessResult(
@@ -84,16 +75,11 @@ namespace MomOi.API.Services.Expert
 
         public async Task<ApiResponse<object>> GetAssignedMomsAsync()
         {
-            // In v1: Expert can see all Moms who have health profiles
             var momRole = await _userManager.GetUsersInRoleAsync(AppRoles.Mom);
 
             var result = momRole.Select(u => new
             {
-                u.Id,
-                u.Email,
-                u.FullName,
-                u.CreatedAt,
-                u.Tier
+                u.Id, u.Email, u.FullName, u.CreatedAt, u.Tier
             }).OrderByDescending(u => u.CreatedAt);
 
             return ApiResponse<object>.SuccessResult(result, "Lấy danh sách Mẹ thành công.");
@@ -105,21 +91,21 @@ namespace MomOi.API.Services.Expert
             if (mom == null)
                 return ApiResponse<object>.FailureResult("Không tìm thấy người dùng.");
 
-            // Find or create a chat session between expert and mom
-            var session = await _context.ChatSessions
-                .FirstOrDefaultAsync(s => s.UserId == momId && s.SessionId == $"expert_{expertId}");
+            var sessionKey = $"expert_{expertId}";
+            var session = await _unitOfWork.Repository<ChatSession>()
+                .FirstOrDefaultAsync(s => s.UserId == momId && s.SessionId == sessionKey);
 
             if (session == null)
             {
                 session = new ChatSession
                 {
                     UserId = momId,
-                    SessionId = $"expert_{expertId}",
+                    SessionId = sessionKey,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
                 };
-                _context.ChatSessions.Add(session);
-                await _context.SaveChangesAsync();
+                await _unitOfWork.Repository<ChatSession>().AddAsync(session);
+                await _unitOfWork.SaveChangesAsync();
             }
 
             var message = new ChatMessage
@@ -129,10 +115,10 @@ namespace MomOi.API.Services.Expert
                 Text = dto.Message,
                 Timestamp = DateTime.UtcNow
             };
-            _context.ChatMessages.Add(message);
+            await _unitOfWork.Repository<ChatMessage>().AddAsync(message);
 
             session.UpdatedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
 
             return ApiResponse<object>.SuccessResult(
                 (object)new { MessageId = message.Id, SentAt = message.Timestamp },

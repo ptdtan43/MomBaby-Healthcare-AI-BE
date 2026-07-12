@@ -1,10 +1,7 @@
-using Microsoft.EntityFrameworkCore;
-using MomOi.API.Data;
 using MomOi.API.DTOs;
 using MomOi.API.Models;
 using MomOi.API.Models.Health;
 using MomOi.API.Repositories;
-using MomOi.API.Services.Alert;
 using System;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -14,14 +11,11 @@ namespace MomOi.API.Services.Medication
 {
     public class MedicationService : IMedicationService
     {
-        // For Medication, since it has complex includes (.Include(m => m.AdherenceLogs)),
-        // it's easier to inject AppDbContext directly or use a specialized repository.
-        // We will inject AppDbContext to maintain full EF Core power for related entities.
-        private readonly AppDbContext _context;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public MedicationService(AppDbContext context)
+        public MedicationService(IUnitOfWork unitOfWork)
         {
-            _context = context;
+            _unitOfWork = unitOfWork;
         }
 
         public async Task<ApiResponse<object>> AddMedicationScheduleAsync(string userId, MedicationScheduleRequestDto request)
@@ -50,8 +44,8 @@ namespace MomOi.API.Services.Medication
                 UpdatedAt = DateTime.UtcNow
             };
 
-            _context.MedicationSchedules.Add(schedule);
-            await _context.SaveChangesAsync();
+            await _unitOfWork.Repository<MedicationSchedule>().AddAsync(schedule);
+            await _unitOfWork.SaveChangesAsync();
 
             return ApiResponse<object>.SuccessResult(schedule, "Tạo lịch uống thuốc thành công.");
         }
@@ -59,13 +53,24 @@ namespace MomOi.API.Services.Medication
         public async Task<ApiResponse<object>> GetUserMedicationsAsync(string userId)
         {
             var now = DateTime.UtcNow;
-            var meds = await _context.MedicationSchedules
-                .Where(m => m.UserId == userId && m.EndDate >= now)
-                .Include(m => m.AdherenceLogs)
-                .OrderBy(m => m.StartDate)
-                .ToListAsync();
+            var meds = await _unitOfWork.Repository<MedicationSchedule>()
+                .FindAsync(m => m.UserId == userId && m.EndDate >= now);
 
-            return ApiResponse<object>.SuccessResult(meds);
+            // Load adherence logs for all meds
+            var scheduleIds = meds.Select(m => m.Id).ToList();
+            var adherenceLogs = await _unitOfWork.Repository<MedicationAdherenceLog>()
+                .FindAsync(l => scheduleIds.Contains(l.MedicationScheduleId));
+
+            // Attach adherence logs to each schedule
+            foreach (var med in meds)
+            {
+                med.AdherenceLogs = adherenceLogs
+                    .Where(l => l.MedicationScheduleId == med.Id)
+                    .ToList();
+            }
+
+            var result = meds.OrderBy(m => m.StartDate).ToList();
+            return ApiResponse<object>.SuccessResult(result);
         }
 
         public async Task<ApiResponse<object>> UpdateAdherenceAsync(string userId, int id, AdherenceRequestDto request)
@@ -75,8 +80,7 @@ namespace MomOi.API.Services.Medication
                 return ApiResponse<object>.FailureResult("Trạng thái phải là 'taken' hoặc 'skipped'.");
             }
 
-            var schedule = await _context.MedicationSchedules
-                .Include(m => m.AdherenceLogs)
+            var schedule = await _unitOfWork.Repository<MedicationSchedule>()
                 .FirstOrDefaultAsync(m => m.Id == id && m.UserId == userId);
 
             if (schedule == null)
@@ -90,15 +94,17 @@ namespace MomOi.API.Services.Medication
                 return ApiResponse<object>.FailureResult("Ngày nằm ngoài khoảng thời gian của lịch uống thuốc.");
             }
 
-            var existing = schedule.AdherenceLogs.FirstOrDefault(l => l.Date.Date == targetDate);
+            var existing = await _unitOfWork.Repository<MedicationAdherenceLog>()
+                .FirstOrDefaultAsync(l => l.MedicationScheduleId == schedule.Id && l.Date.Date == targetDate);
+
             if (existing != null)
             {
                 existing.Status = Enum.TryParse<AdherenceStatus>(request.Status, true, out var s2) ? s2 : AdherenceStatus.Taken;
-                _context.MedicationAdherenceLogs.Update(existing);
+                _unitOfWork.Repository<MedicationAdherenceLog>().Update(existing);
             }
             else
             {
-                _context.MedicationAdherenceLogs.Add(new MedicationAdherenceLog
+                await _unitOfWork.Repository<MedicationAdherenceLog>().AddAsync(new MedicationAdherenceLog
                 {
                     MedicationScheduleId = schedule.Id,
                     Date = targetDate,
@@ -107,14 +113,14 @@ namespace MomOi.API.Services.Medication
             }
 
             schedule.UpdatedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
 
             return ApiResponse<object>.SuccessResult(null!, "Cập nhật trạng thái uống thuốc thành công.");
         }
 
         public async Task<ApiResponse<object>> DeleteMedicationScheduleAsync(string userId, int id)
         {
-            var schedule = await _context.MedicationSchedules
+            var schedule = await _unitOfWork.Repository<MedicationSchedule>()
                 .FirstOrDefaultAsync(m => m.Id == id && m.UserId == userId);
 
             if (schedule == null)
@@ -122,8 +128,8 @@ namespace MomOi.API.Services.Medication
                 return ApiResponse<object>.FailureResult("Không tìm thấy lịch uống thuốc.");
             }
 
-            _context.MedicationSchedules.Remove(schedule);
-            await _context.SaveChangesAsync();
+            _unitOfWork.Repository<MedicationSchedule>().Remove(schedule);
+            await _unitOfWork.SaveChangesAsync();
 
             return ApiResponse<object>.SuccessResult(null!, "Xoá lịch uống thuốc thành công.");
         }

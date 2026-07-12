@@ -1,10 +1,9 @@
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
-using MomOi.API.Data;
 using MomOi.API.DTOs;
 using MomOi.API.DTOs.Auth;
 using MomOi.API.Models.Health;
 using MomOi.API.Models.Identity;
+using MomOi.API.Repositories;
 using System;
 using System.Threading.Tasks;
 
@@ -12,18 +11,19 @@ namespace MomOi.API.Services.UserProfile
 {
     public class UserProfileService : IUserProfileService
     {
-        private readonly AppDbContext _context;
+        // UserManager là đặc thù của ASP.NET Identity, không thể thay bằng Repository
         private readonly UserManager<AppUser> _userManager;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public UserProfileService(AppDbContext context, UserManager<AppUser> userManager)
+        public UserProfileService(IUnitOfWork unitOfWork, UserManager<AppUser> userManager)
         {
-            _context = context;
+            _unitOfWork = unitOfWork;
             _userManager = userManager;
         }
 
         public async Task<ApiResponse<object>> GetProfileAsync(string userId)
         {
-            var profile = await _context.MomHealthProfiles
+            var profile = await _unitOfWork.Repository<MomHealthProfile>()
                 .FirstOrDefaultAsync(p => p.UserId == userId);
 
             if (profile == null)
@@ -34,8 +34,8 @@ namespace MomOi.API.Services.UserProfile
                     Stage = JourneyStage.PrePregnancy,
                     UpdatedAt = DateTime.UtcNow
                 };
-                _context.MomHealthProfiles.Add(profile);
-                await _context.SaveChangesAsync();
+                await _unitOfWork.Repository<MomHealthProfile>().AddAsync(profile);
+                await _unitOfWork.SaveChangesAsync();
             }
 
             return ApiResponse<object>.SuccessResult(profile);
@@ -43,7 +43,7 @@ namespace MomOi.API.Services.UserProfile
 
         public async Task<ApiResponse<object>> UpdateProfileAsync(string userId, MomHealthProfile updateDto)
         {
-            var profile = await _context.MomHealthProfiles
+            var profile = await _unitOfWork.Repository<MomHealthProfile>()
                 .FirstOrDefaultAsync(p => p.UserId == userId);
 
             if (profile == null)
@@ -63,7 +63,7 @@ namespace MomOi.API.Services.UserProfile
             profile.IsBreastfeeding = updateDto.IsBreastfeeding;
             profile.UpdatedAt = DateTime.UtcNow;
 
-            await _context.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
 
             return ApiResponse<object>.SuccessResult(profile, "Cập nhật hồ sơ sức khỏe thành công.");
         }
@@ -74,7 +74,7 @@ namespace MomOi.API.Services.UserProfile
             if (user == null) return ApiResponse<object>.FailureResult("Người dùng không tồn tại.");
 
             user.Tier = tier;
-            user.TierExpiresAt = DateTime.UtcNow.AddMonths(1); // 1 month subscription
+            user.TierExpiresAt = DateTime.UtcNow.AddMonths(1);
             await _userManager.UpdateAsync(user);
 
             var response = new UserResponseDto

@@ -1,7 +1,7 @@
-using Microsoft.EntityFrameworkCore;
-using MomOi.API.Data;
 using MomOi.API.DTOs;
 using MomOi.API.Models.Health;
+using MomOi.API.Repositories;
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -9,23 +9,19 @@ namespace MomOi.API.Services.Alert
 {
     public class AlertService : IAlertService
     {
-        private readonly AppDbContext _context;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public AlertService(AppDbContext context)
+        public AlertService(IUnitOfWork unitOfWork)
         {
-            _context = context;
+            _unitOfWork = unitOfWork;
         }
 
         public async Task<ApiResponse<object>> GetUserAlertsAsync(string userId, NotificationStatus? status)
         {
-            var query = _context.NotificationAlerts.Where(a => a.UserId == userId);
+            var all = await _unitOfWork.Repository<NotificationAlert>()
+                .FindAsync(a => a.UserId == userId && (!status.HasValue || a.Status == status.Value));
 
-            if (status.HasValue)
-            {
-                query = query.Where(a => a.Status == status.Value);
-            }
-
-            var alerts = await query.OrderByDescending(a => a.CreatedAt).Take(100).ToListAsync();
+            var alerts = all.OrderByDescending(a => a.CreatedAt).Take(100).ToList();
 
             return ApiResponse<object>.SuccessResult(alerts, "Lấy danh sách cảnh báo thành công.");
         }
@@ -45,33 +41,35 @@ namespace MomOi.API.Services.Alert
                 Message = request.Message,
                 Channels = request.Channels,
                 Status = NotificationStatus.Pending,
-                CreatedAt = System.DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow
             };
 
-            _context.NotificationAlerts.Add(alert);
-            await _context.SaveChangesAsync();
+            await _unitOfWork.Repository<NotificationAlert>().AddAsync(alert);
+            await _unitOfWork.SaveChangesAsync();
 
             return ApiResponse<object>.SuccessResult(alert, "Tạo cảnh báo thành công.");
         }
 
         public async Task<ApiResponse<object>> UpdateAlertStatusAsync(string userId, int id, UpdateAlertStatusRequestDto request)
         {
-            var alert = await _context.NotificationAlerts.FirstOrDefaultAsync(a => a.Id == id && a.UserId == userId);
+            var alert = await _unitOfWork.Repository<NotificationAlert>()
+                .FirstOrDefaultAsync(a => a.Id == id && a.UserId == userId);
             if (alert == null) return ApiResponse<object>.FailureResult("Không tìm thấy cảnh báo.");
 
             alert.Status = request.Status;
-            await _context.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
 
             return ApiResponse<object>.SuccessResult(alert, "Cập nhật trạng thái cảnh báo thành công.");
         }
 
         public async Task<ApiResponse<object>> DeleteAlertAsync(string userId, int id)
         {
-            var alert = await _context.NotificationAlerts.FirstOrDefaultAsync(a => a.Id == id && a.UserId == userId);
+            var alert = await _unitOfWork.Repository<NotificationAlert>()
+                .FirstOrDefaultAsync(a => a.Id == id && a.UserId == userId);
             if (alert == null) return ApiResponse<object>.FailureResult("Không tìm thấy cảnh báo.");
 
-            _context.NotificationAlerts.Remove(alert);
-            await _context.SaveChangesAsync();
+            _unitOfWork.Repository<NotificationAlert>().Remove(alert);
+            await _unitOfWork.SaveChangesAsync();
 
             return ApiResponse<object>.SuccessResult(null!, "Xóa cảnh báo thành công.");
         }

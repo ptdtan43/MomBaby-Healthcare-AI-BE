@@ -1,9 +1,8 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using MomOi.API.Data;
 using MomOi.API.DTOs;
 using MomOi.API.Models.Nutrition;
+using MomOi.API.Repositories;
 using System;
 using System.Linq;
 using System.Net.Http;
@@ -15,18 +14,18 @@ namespace MomOi.API.Services.Integration
     public class UsdaClientService : IUsdaClientService
     {
         private readonly HttpClient _httpClient;
-        private readonly AppDbContext _context;
+        private readonly IUnitOfWork _unitOfWork;
         private readonly IConfiguration _config;
         private readonly ILogger<UsdaClientService> _logger;
 
         public UsdaClientService(
             HttpClient httpClient,
-            AppDbContext context,
+            IUnitOfWork unitOfWork,
             IConfiguration config,
             ILogger<UsdaClientService> logger)
         {
             _httpClient = httpClient;
-            _context = context;
+            _unitOfWork = unitOfWork;
             _config = config;
             _logger = logger;
         }
@@ -43,7 +42,7 @@ namespace MomOi.API.Services.Integration
             {
                 var url = $"https://api.nal.usda.gov/fdc/v1/foods/search?api_key={apiKey}&query={Uri.EscapeDataString(query)}&pageSize={maxItems}";
                 var response = await _httpClient.GetAsync(url);
-                
+
                 if (!response.IsSuccessStatusCode)
                 {
                     _logger.LogError("USDA API trả về lỗi: {Status}", response.StatusCode);
@@ -65,7 +64,6 @@ namespace MomOi.API.Services.Integration
                     int fdcId = food.GetProperty("fdcId").GetInt32();
                     string description = food.GetProperty("description").GetString() ?? "";
 
-                    // Default nutrients
                     float calories = 0, protein = 0, carbs = 0, fat = 0;
 
                     if (food.TryGetProperty("foodNutrients", out var nutrients))
@@ -77,16 +75,17 @@ namespace MomOi.API.Services.Integration
 
                             switch (nutrientId)
                             {
-                                case 1008: calories = value; break; // Energy
-                                case 1003: protein = value; break;  // Protein
-                                case 1005: carbs = value; break;    // Carbohydrate
-                                case 1004: fat = value; break;      // Total lipid (fat)
+                                case 1008: calories = value; break;
+                                case 1003: protein = value; break;
+                                case 1005: carbs = value; break;
+                                case 1004: fat = value; break;
                             }
                         }
                     }
 
-                    // Insert or update in DB
-                    var existing = await _context.UsdaFoodItems.FirstOrDefaultAsync(f => f.FdcId == fdcId);
+                    var existing = await _unitOfWork.Repository<UsdaFoodItem>()
+                        .FirstOrDefaultAsync(f => f.FdcId == fdcId);
+
                     if (existing != null)
                     {
                         existing.Description = description;
@@ -98,7 +97,7 @@ namespace MomOi.API.Services.Integration
                     }
                     else
                     {
-                        var newItem = new UsdaFoodItem
+                        await _unitOfWork.Repository<UsdaFoodItem>().AddAsync(new UsdaFoodItem
                         {
                             FdcId = fdcId,
                             Description = description,
@@ -107,14 +106,13 @@ namespace MomOi.API.Services.Integration
                             Carbs = carbs,
                             Fat = fat,
                             SyncDate = DateTime.UtcNow
-                        };
-                        _context.UsdaFoodItems.Add(newItem);
+                        });
                     }
                     syncedCount++;
                 }
 
-                await _context.SaveChangesAsync();
-                return ApiResponse<object>.SuccessResult((object)$"Đã đồng bộ thành công {syncedCount} thực phẩm.", $"Đồng bộ USDA thành công.");
+                await _unitOfWork.SaveChangesAsync();
+                return ApiResponse<object>.SuccessResult((object)$"Đã đồng bộ thành công {syncedCount} thực phẩm.", "Đồng bộ USDA thành công.");
             }
             catch (Exception ex)
             {
