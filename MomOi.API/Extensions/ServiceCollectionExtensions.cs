@@ -55,7 +55,7 @@ namespace MomOi.API.Extensions
         public static IServiceCollection AddDatabase(this IServiceCollection services, IConfiguration configuration)
         {
             var connectionString = configuration.GetConnectionString("DefaultConnection")
-                ?? "Host=pgdb;Port=5432;Database=MomOiDb;Username=postgres;Password=postgres;";
+                ?? throw new InvalidOperationException("Chưa cấu hình DefaultConnection!");
 
             services.AddDbContext<AppDbContext>(options =>
                 options.UseNpgsql(connectionString, npgsqlOptions =>
