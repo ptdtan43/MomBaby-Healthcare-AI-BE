@@ -12,5 +12,6 @@ namespace MomOi.API.Services.Postpartum
         Task<ApiResponse<VoiceJournalResult>> AnalyzeVoiceJournalAsync(string userId, string audioBase64, string mimeType);
         Task<ApiResponse<object>> LogBreastfeedingAsync(string userId, string side, int durationMinutes, DateTime time);
         Task<ApiResponse<object>> GetRecoveryPlanAsync(string userId, int? day);
+        Task<ApiResponse<object>> GetLatestEpdsAsync(string userId);
     }
 }

@@ -224,5 +224,30 @@ namespace MomOi.API.Services.Postpartum
 
             return ApiResponse<object>.SuccessResult(result);
         }
+
+        public async Task<ApiResponse<object>> GetLatestEpdsAsync(string userId)
+        {
+            var profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId);
+            if (profile == null)
+            {
+                return ApiResponse<object>.FailureResult("Không tìm thấy hồ sơ sức khỏe.");
+            }
+
+            var assessments = await _epdsRepo.FindAsync(e => e.ProfileId == profile.Id);
+            var latest = assessments.OrderByDescending(e => e.TakenAt).FirstOrDefault();
+
+            if (latest == null)
+            {
+                return ApiResponse<object>.SuccessResult(new { score = 0, isUrgent = false, takenAt = (DateTime?)null }, "Chưa thực hiện khảo sát EPDS nào.");
+            }
+
+            return ApiResponse<object>.SuccessResult(new
+            {
+                score = latest.TotalScore,
+                isUrgent = latest.IsUrgent,
+                takenAt = latest.TakenAt,
+                aiAnalysis = latest.AiAnalysis
+            });
+        }
     }
 }

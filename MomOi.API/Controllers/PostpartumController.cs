@@ -128,5 +128,19 @@ namespace MomOi.API.Controllers
             var response = await _postpartumService.GetRecoveryPlanAsync(userId, day);
             return response.Success ? Ok(response) : BadRequest(response);
         }
+
+        /// <summary>
+        /// Retrieves the latest EPDS survey result for the current user.
+        /// </summary>
+        [HttpGet("epds/latest")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetLatestEpds()
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            var response = await _postpartumService.GetLatestEpdsAsync(userId);
+            return response.Success ? Ok(response) : BadRequest(response);
+        }
     }
 }

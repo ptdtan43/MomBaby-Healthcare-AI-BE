@@ -65,10 +65,12 @@ namespace MomOi.API.Services.Pregnancy
             if (week < 1) week = 1;
             if (week > 42) week = 42;
 
+            var calcDueDate = dueDate ?? lastMenstrualPeriod.AddDays(280);
+
             profile.PregnancyWeek = week;
+            profile.DeliveryDate = calcDueDate;
             await _profileRepo.SaveChangesAsync();
 
-            var calcDueDate = dueDate ?? lastMenstrualPeriod.AddDays(280);
             var trimester = week <= 12 ? 1 : (week <= 27 ? 2 : 3);
             var milestone = $"Tuần {week}: Bé đang hình thành và phát triển tích cực.";
 

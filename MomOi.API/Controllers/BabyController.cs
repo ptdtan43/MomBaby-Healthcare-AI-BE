@@ -68,5 +68,19 @@ namespace MomOi.API.Controllers
             var response = await _babyService.LogGrowthAsync(userId, id, record);
             return response.Success ? Ok(response) : NotFound(response);
         }
+
+        /// <summary>
+        /// Updates an existing baby profile.
+        /// </summary>
+        [HttpPut("{id}")]
+        [ProducesResponseType(typeof(ApiResponse<BabyProfile>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> UpdateBabyProfile(int id, [FromBody] BabyProfile profile)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            var response = await _babyService.UpdateBabyProfileAsync(userId, id, profile);
+            return response.Success ? Ok(response) : BadRequest(response);
+        }
     }
 }

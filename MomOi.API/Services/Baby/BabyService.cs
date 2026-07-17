@@ -37,8 +37,16 @@ namespace MomOi.API.Services.Baby
 
         public async Task<ApiResponse<List<BabyProfile>>> GetBabyProfilesAsync(string userId)
         {
-            var profiles = await _babyRepo.FindAsync(p => p.UserId == userId);
-            return ApiResponse<List<BabyProfile>>.SuccessResult(profiles.ToList());
+            var profiles = (await _babyRepo.FindAsync(p => p.UserId == userId)).ToList();
+            var profileIds = profiles.Select(p => p.Id).ToList();
+            var growthRecords = (await _growthRepo.FindAsync(g => profileIds.Contains(g.BabyProfileId))).ToList();
+
+            foreach (var profile in profiles)
+            {
+                profile.GrowthRecords = growthRecords.Where(g => g.BabyProfileId == profile.Id).ToList();
+            }
+
+            return ApiResponse<List<BabyProfile>>.SuccessResult(profiles);
         }
 
         public async Task<ApiResponse<GrowthEvaluationResult>> LogGrowthAsync(string userId, int babyId, GrowthRecord record)
@@ -69,6 +77,28 @@ namespace MomOi.API.Services.Baby
             );
 
             return ApiResponse<GrowthEvaluationResult>.SuccessResult(evaluation, "Ghi nhận chỉ số tăng trưởng và đánh giá thành công.");
+        }
+
+        public async Task<ApiResponse<BabyProfile>> UpdateBabyProfileAsync(string userId, int id, BabyProfile profile)
+        {
+            var existing = await _babyRepo.FirstOrDefaultAsync(b => b.Id == id && b.UserId == userId);
+            if (existing == null)
+            {
+                return ApiResponse<BabyProfile>.FailureResult("Không tìm thấy hồ sơ của bé.");
+            }
+
+            existing.BabyName = profile.BabyName;
+            existing.DateOfBirth = profile.DateOfBirth;
+            existing.Gender = profile.Gender;
+            existing.CurrentWeightKg = profile.CurrentWeightKg;
+            existing.CurrentHeightCm = profile.CurrentHeightCm;
+            existing.Allergies = profile.Allergies;
+            existing.FoodHistory = profile.FoodHistory;
+
+            _babyRepo.Update(existing);
+            await _babyRepo.SaveChangesAsync();
+
+            return ApiResponse<BabyProfile>.SuccessResult(existing, "Cập nhật hồ sơ bé thành công.");
         }
     }
 }
