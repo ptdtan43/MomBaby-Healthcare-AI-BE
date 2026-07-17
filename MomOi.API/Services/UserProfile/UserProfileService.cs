@@ -58,8 +58,12 @@ namespace MomOi.API.Services.UserProfile
             profile.HasGestDiabetes = updateDto.HasGestDiabetes;
             profile.MedicalConditions = updateDto.MedicalConditions;
             profile.AvgCycleLength = updateDto.AvgCycleLength;
-            profile.LastPeriodDate = updateDto.LastPeriodDate;
-            profile.DeliveryDate = updateDto.DeliveryDate;
+            profile.LastPeriodDate = updateDto.LastPeriodDate.HasValue 
+                ? DateTime.SpecifyKind(updateDto.LastPeriodDate.Value, DateTimeKind.Utc) 
+                : null;
+            profile.DeliveryDate = updateDto.DeliveryDate.HasValue 
+                ? DateTime.SpecifyKind(updateDto.DeliveryDate.Value, DateTimeKind.Utc) 
+                : null;
             profile.IsBreastfeeding = updateDto.IsBreastfeeding;
             profile.UpdatedAt = DateTime.UtcNow;
 
