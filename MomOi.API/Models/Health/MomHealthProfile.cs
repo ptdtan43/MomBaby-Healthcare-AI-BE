@@ -45,6 +45,16 @@ namespace MomOi.API.Models.Health
         public float? Bmi { get; set; }
 
         /// <summary>
+        /// Height of the mother in cm.
+        /// </summary>
+        public float? Height { get; set; }
+
+        /// <summary>
+        /// Weight of the mother in kg.
+        /// </summary>
+        public float? Weight { get; set; }
+
+        /// <summary>
         /// Blood glucose level (mmol/L or mg/dL).
         /// </summary>
         public float? BloodSugarLevel { get; set; }

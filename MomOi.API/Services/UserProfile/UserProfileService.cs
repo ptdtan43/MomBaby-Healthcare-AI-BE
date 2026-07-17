@@ -54,6 +54,8 @@ namespace MomOi.API.Services.UserProfile
             profile.Stage = updateDto.Stage;
             profile.PregnancyWeek = updateDto.PregnancyWeek;
             profile.Bmi = updateDto.Bmi;
+            profile.Height = updateDto.Height;
+            profile.Weight = updateDto.Weight;
             profile.BloodSugarLevel = updateDto.BloodSugarLevel;
             profile.HasGestDiabetes = updateDto.HasGestDiabetes;
             profile.MedicalConditions = updateDto.MedicalConditions;

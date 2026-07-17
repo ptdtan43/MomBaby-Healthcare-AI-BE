@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -546,6 +546,8 @@ namespace MomOi.API.Migrations
                     stage = table.Column<int>(type: "integer", nullable: false),
                     pregnancy_week = table.Column<int>(type: "integer", nullable: true),
                     bmi = table.Column<float>(type: "real", nullable: true),
+                    height = table.Column<float>(type: "real", nullable: true),
+                    weight = table.Column<float>(type: "real", nullable: true),
                     blood_sugar_level = table.Column<float>(type: "real", nullable: true),
                     has_gest_diabetes = table.Column<bool>(type: "boolean", nullable: false),
                     medical_conditions = table.Column<string[]>(type: "text[]", nullable: true),
