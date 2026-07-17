@@ -20,10 +20,12 @@ namespace MomOi.API.Controllers
     public class BabyController : ControllerBase
     {
         private readonly IBabyService _babyService;
+        private readonly Services.Nutrition.NutritionProxyService _nutritionProxy;
 
-        public BabyController(IBabyService babyService)
+        public BabyController(IBabyService babyService, Services.Nutrition.NutritionProxyService nutritionProxy)
         {
             _babyService = babyService;
+            _nutritionProxy = nutritionProxy;
         }
 
         /// <summary>
@@ -81,6 +83,58 @@ namespace MomOi.API.Controllers
 
             var response = await _babyService.UpdateBabyProfileAsync(userId, id, profile);
             return response.Success ? Ok(response) : BadRequest(response);
+        }
+
+        /// <summary>
+        /// Retrieves the recommended daily menu for a baby from the Python nutrition engine.
+        /// </summary>
+        [HttpGet("{id}/menu/daily")]
+        public async Task<IActionResult> GetDailyMenu(int id)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            var menu = await _nutritionProxy.GetBabyDailyMenuAsync(id);
+            if (menu == null)
+            {
+                return NotFound(new ApiResponse<object>
+                {
+                    Success = false,
+                    Message = "Không thể tải thực đơn hàng ngày cho bé từ hệ thống AI Dinh dưỡng."
+                });
+            }
+
+            return Ok(new ApiResponse<object>
+            {
+                Success = true,
+                Data = menu
+            });
+        }
+
+        /// <summary>
+        /// Retrieves the recommended weekly menu for a baby from the Python nutrition engine.
+        /// </summary>
+        [HttpGet("{id}/menu/weekly")]
+        public async Task<IActionResult> GetWeeklyMenu(int id)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            var menu = await _nutritionProxy.GetBabyWeeklyMenuAsync(id);
+            if (menu == null)
+            {
+                return NotFound(new ApiResponse<object>
+                {
+                    Success = false,
+                    Message = "Không thể tải thực đơn hàng tuần cho bé từ hệ thống AI Dinh dưỡng."
+                });
+            }
+
+            return Ok(new ApiResponse<object>
+            {
+                Success = true,
+                Data = menu
+            });
         }
     }
 }

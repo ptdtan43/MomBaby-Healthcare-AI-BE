@@ -80,5 +80,57 @@ namespace MomOi.API.Services.Nutrition
                 return null;
             }
         }
+
+        /// <summary>
+        /// Retrieves the recommended daily menu for a baby from the Python nutrition engine.
+        /// </summary>
+        public async Task<object?> GetBabyDailyMenuAsync(int babyId)
+        {
+            try
+            {
+                _logger.LogInformation("Calling Nutrition API to get daily menu for baby {BabyId}", babyId);
+                var response = await _httpClient.GetAsync($"/api/baby/{babyId}/menu/daily");
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var data = await response.Content.ReadFromJsonAsync<object>();
+                    return data;
+                }
+
+                _logger.LogWarning("Nutrition API returned error for daily menu: {StatusCode}", response.StatusCode);
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to call Nutrition API for daily menu of baby {BabyId}", babyId);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Retrieves the recommended weekly menu for a baby from the Python nutrition engine.
+        /// </summary>
+        public async Task<object?> GetBabyWeeklyMenuAsync(int babyId)
+        {
+            try
+            {
+                _logger.LogInformation("Calling Nutrition API to get weekly menu for baby {BabyId}", babyId);
+                var response = await _httpClient.GetAsync($"/api/baby/{babyId}/menu/weekly");
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var data = await response.Content.ReadFromJsonAsync<object>();
+                    return data;
+                }
+
+                _logger.LogWarning("Nutrition API returned error for weekly menu: {StatusCode}", response.StatusCode);
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to call Nutrition API for weekly menu of baby {BabyId}", babyId);
+                return null;
+            }
+        }
     }
 }
