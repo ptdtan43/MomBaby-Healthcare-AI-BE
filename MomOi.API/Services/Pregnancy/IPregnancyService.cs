@@ -13,5 +13,7 @@ namespace MomOi.API.Services.Pregnancy
         Task<ApiResponse<object>> LogWeightAsync(string userId, float weightKg, DateTime date);
         Task<ApiResponse<object>> GetExercisePlanAsync(string userId);
         Task<ApiResponse<object>> LogExerciseAsync(string userId, int stepCount, string exerciseType, int durationMinutes);
+        Task<ApiResponse<object>> GetWeightLogsAsync(string userId);
+        Task<ApiResponse<object>> GetTodayStepsAsync(string userId);
     }
 }

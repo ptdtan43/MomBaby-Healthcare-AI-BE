@@ -286,6 +286,26 @@ namespace MomOi.API.Services.Pregnancy
             return ApiResponse<object>.SuccessResult(new { Alerts = br03Alerts }, "Ghi nhận vận động thành công.");
         }
 
+        public async Task<ApiResponse<object>> GetWeightLogsAsync(string userId)
+        {
+            var logs = await _pregLogRepo.FindAsync(p => p.UserId == userId && p.Weight.HasValue);
+            var sortedLogs = logs.OrderBy(l => l.RecordedAt)
+                                 .Select(l => new {
+                                     week = l.Week,
+                                     weight = l.Weight,
+                                     recordedAt = l.RecordedAt
+                                 }).ToList();
+            return ApiResponse<object>.SuccessResult(sortedLogs);
+        }
+
+        public async Task<ApiResponse<object>> GetTodayStepsAsync(string userId)
+        {
+            var today = DateTime.UtcNow.Date;
+            var logs = await _exerciseRepo.FindAsync(e => e.UserId == userId && e.RecordedAt >= today);
+            int totalSteps = logs.Sum(e => e.StepCount);
+            return ApiResponse<object>.SuccessResult(new { todaySteps = totalSteps });
+        }
+
         private object GetMilestoneForWeek(int week)
         {
             string sizeStr = "bằng quả chanh ta";

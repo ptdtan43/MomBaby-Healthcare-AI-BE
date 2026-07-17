@@ -150,5 +150,33 @@ namespace MomOi.API.Controllers
             var response = await _pregnancyService.LogExerciseAsync(userId, request.StepCount, request.ExerciseType, request.DurationMinutes);
             return response.Success ? Ok(response) : BadRequest(response);
         }
+
+        /// <summary>
+        /// Retrieves all weight logs for the current user.
+        /// </summary>
+        [HttpGet("weight-logs")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetWeightLogs()
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            var response = await _pregnancyService.GetWeightLogsAsync(userId);
+            return response.Success ? Ok(response) : BadRequest(response);
+        }
+
+        /// <summary>
+        /// Retrieves today's total steps logged.
+        /// </summary>
+        [HttpGet("today-steps")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetTodaySteps()
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            var response = await _pregnancyService.GetTodayStepsAsync(userId);
+            return response.Success ? Ok(response) : BadRequest(response);
+        }
     }
 }
