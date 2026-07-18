@@ -19,7 +19,6 @@ using MomOi.API.Services.Alert;
 using MomOi.API.Services.Auth;
 using MomOi.API.Services.Baby;
 using MomOi.API.Services.BusinessRules;
-using MomOi.API.Services.Chat;
 using MomOi.API.Services.DailyMonitoring;
 using MomOi.API.Services.Dashboard;
 using MomOi.API.Services.Diet;
@@ -145,7 +144,6 @@ namespace MomOi.API.Extensions
             services.AddScoped<IMedicationService, MedicationService>();
             services.AddScoped<IDietService, DietService>();
             services.AddScoped<IDashboardService, DashboardService>();
-            services.AddScoped<IChatService, ChatService>();
             services.AddScoped<IRecipeService, RecipeService>();
             services.AddScoped<IAlertService, AlertService>();
             services.AddScoped<IUserProfileService, UserProfileService>();

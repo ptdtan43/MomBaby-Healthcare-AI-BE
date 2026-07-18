@@ -54,7 +54,7 @@ namespace MomOi.API.Models.Health
         public int SeverityScore { get; set; } = 0;
         public bool AlertFlag { get; set; } = false;
         public int? ProcessingTimeMs { get; set; }
-        public string GeminiModel { get; set; } = "gemini-1.5-pro";
+        public string GeminiModel { get; set; } = "gemini-2.5-flash";
         public bool IsAdminReviewRequired { get; set; } = false;
     }
 }

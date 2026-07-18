@@ -18,11 +18,22 @@ namespace MomOi.API.Services.AI
         private readonly string? _apiKey;
         private readonly ILogger<GeminiService> _logger;
 
+        /// <summary>Model dùng cho sinh văn bản/JSON. Cấu hình qua "Gemini:TextModel".</summary>
+        private readonly string _textModel;
+
+        /// <summary>Model dùng cho tác vụ đa phương thức (audio/ảnh). Cấu hình qua "Gemini:ProModel".</summary>
+        private readonly string _proModel;
+
         public GeminiService(HttpClient httpClient, IConfiguration configuration, ILogger<GeminiService> logger)
         {
             _httpClient = httpClient;
             _logger = logger;
             _apiKey = configuration["GEMINI_API_KEY"] ?? configuration["Gemini:ApiKey"];
+
+            // Dòng gemini-1.5 đã bị Google ngừng cấp cho các project mới (trả 404 NOT_FOUND),
+            // nên mặc định dùng thế hệ 2.5. Có thể ghi đè trong appsettings mà không phải sửa code.
+            _textModel = configuration["Gemini:TextModel"] ?? "gemini-2.5-flash";
+            _proModel = configuration["Gemini:ProModel"] ?? "gemini-2.5-pro";
 
             // Increase timeout for audio processing
             _httpClient.Timeout = TimeSpan.FromSeconds(60);
@@ -158,7 +169,7 @@ namespace MomOi.API.Services.AI
                 };
 
                 var jsonPayload = JsonSerializer.Serialize(requestBody);
-                var requestUrl = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={_apiKey}";
+                var requestUrl = $"https://generativelanguage.googleapis.com/v1beta/models/{_proModel}:generateContent?key={_apiKey}";
 
                 var request = new HttpRequestMessage(HttpMethod.Post, requestUrl)
                 {
@@ -201,35 +212,21 @@ namespace MomOi.API.Services.AI
             }
         }
 
-        public async Task<string> SendChatMessageAsync(string userMessage, string healthContext)
+        public async Task<string> GenerateJsonAsync(string prompt)
         {
-            var fallbackReply = "Mình đang ở đây để lắng nghe mami! Hệ thống AI hiện tạm thời không phản hồi được, mami thử lại sau ít phút nhé 💙.";
-
             if (string.IsNullOrEmpty(_apiKey))
             {
-                _logger.LogWarning("Gemini API key is not configured. Returning mock chat reply.");
-                return "Xin chào mami! (Phản hồi thử nghiệm – vui lòng cấu hình GEMINI_API_KEY để dùng AI thực)";
+                _logger.LogError("Gemini API key is not configured. Cannot run AI analysis.");
+                throw new InvalidOperationException(
+                    "GEMINI_API_KEY chưa được cấu hình. Vui lòng cấu hình khóa API Gemini hợp lệ (dạng 'AIza...').");
             }
 
-            try
-            {
-                var prompt = $"Bạn là trợ lý chăm sóc sức khỏe mẹ và bé MomOi, luôn trả lời bằng tiếng Việt, " +
-                             $"giọng ấm áp, gần gũi như người bạn thân. Không đưa ra chẩn đoán y khoa cụ thể, " +
-                             $"luôn khuyên hỏi bác sĩ cho các vấn đề nghiêm trọng.\n\n" +
-                             $"Thông tin sức khỏe hiện tại của mami:\n{healthContext}\n\n" +
-                             $"Tin nhắn của mami: {userMessage}";
+            // Send the caller's prompt as-is: no conversational persona is added, so the model
+            // is free to obey the JSON-only instruction contained in the prompt.
+            var raw = await CallGeminiTextApiAsync(prompt, jsonMode: true);
 
-                return await CallGeminiTextApiAsync(prompt);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in SendChatMessageAsync. Returning fallback.");
-                if (ex.Message.Contains("429") || ex.Message.Contains("quota", StringComparison.OrdinalIgnoreCase))
-                {
-                    return "Hệ thống AI hiện đang quá tải hoặc đạt giới hạn lượt yêu cầu. Mami vui lòng thử lại sau ít phút nhé 💙.";
-                }
-                return fallbackReply;
-            }
+            // The model often wraps JSON in a markdown code fence — strip it before parsing.
+            return raw.Replace("```json", "").Replace("```", "").Trim();
         }
 
         public async Task<string> GenerateAiDietRecipeAsync(string query)
@@ -281,10 +278,20 @@ namespace MomOi.API.Services.AI
         #region Helper Request Handlers
 
 
-        private async Task<string> CallGeminiTextApiAsync(string prompt)
+        /// <param name="jsonMode">
+        /// Khi true, ép Gemini trả về đúng JSON (responseMimeType = application/json)
+        /// nên không còn phải bóc code fence và không sợ model trả văn xuôi.
+        /// </param>
+        private async Task<string> CallGeminiTextApiAsync(string prompt, bool jsonMode = false)
         {
-            var requestUrl = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_apiKey}";
-            
+            var requestUrl = $"https://generativelanguage.googleapis.com/v1beta/models/{_textModel}:generateContent?key={_apiKey}";
+
+            // Gemini 2.5 bật "thinking" mặc định khiến 1 lượt gọi mất ~18s và vượt timeout của client.
+            // Tắt thinking giảm còn ~8s mà chất lượng câu trả lời không giảm.
+            object generationConfig = jsonMode
+                ? new { thinkingConfig = new { thinkingBudget = 0 }, responseMimeType = "application/json" }
+                : (object)new { thinkingConfig = new { thinkingBudget = 0 } };
+
             var requestBody = new
             {
                 contents = new[]
@@ -296,7 +303,8 @@ namespace MomOi.API.Services.AI
                             new { text = prompt }
                         }
                     }
-                }
+                },
+                generationConfig
             };
 
             var jsonPayload = JsonSerializer.Serialize(requestBody);

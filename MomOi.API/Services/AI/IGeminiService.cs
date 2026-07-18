@@ -39,9 +39,11 @@ namespace MomOi.API.Services.AI
         Task<VoiceJournalResult> AnalyzeVoiceJournalAsync(string audioBase64, string mimeType);
 
         /// <summary>
-        /// Sends a chat message to Gemini with maternal health context and returns the AI reply.
+        /// Sends a raw prompt to Gemini and returns the model output as a JSON string
+        /// (markdown code fences stripped). Throws when the API key is missing or the call fails,
+        /// so callers handle the failure explicitly instead of silently receiving fallback prose.
         /// </summary>
-        Task<string> SendChatMessageAsync(string userMessage, string healthContext);
+        Task<string> GenerateJsonAsync(string prompt);
 
         /// <summary>
         /// Generates a single personalized diet recipe via AI.

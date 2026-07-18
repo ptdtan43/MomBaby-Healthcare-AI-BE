@@ -159,8 +159,8 @@ YÊU CẦU ĐẦU RA (Chỉ trả về chuỗi JSON Array nguyên bản, KHÔNG 
             string aiResponseJson = "";
             try
             {
-                aiResponseJson = await _geminiService.SendChatMessageAsync(prompt, "Bạn là chuyên gia dinh dưỡng nhi khoa hàng đầu.");
-                aiResponseJson = aiResponseJson.Replace("```json", "").Replace("```", "").Trim();
+                aiResponseJson = await _geminiService.GenerateJsonAsync(
+                    "Bạn là chuyên gia dinh dưỡng nhi khoa hàng đầu.\n\n" + prompt);
                 var jsonDoc = JsonDocument.Parse(aiResponseJson);
             }
             catch (Exception)
