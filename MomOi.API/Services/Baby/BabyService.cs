@@ -58,25 +58,73 @@ namespace MomOi.API.Services.Baby
             }
 
             record.BabyProfileId = baby.Id;
-            record.BabyProfile = null!;
-            record.RecordedAt = DateTime.UtcNow;
+            record.BabyProfile = null;
+            if (record.RecordedAt == default)
+            {
+                record.RecordedAt = DateTime.UtcNow;
+            }
 
             await _growthRepo.AddAsync(record);
 
-            baby.CurrentWeightKg = record.WeightKg;
-            baby.CurrentHeightCm = record.HeightCm;
+            // Cập nhật chỉ số hiện tại của bé dựa trên mốc mới nhất (theo RecordedAt)
+            var allRecords = (await _growthRepo.FindAsync(g => g.BabyProfileId == babyId)).ToList();
+            allRecords.Add(record);
+            var latestRecord = allRecords.OrderByDescending(g => g.RecordedAt).First();
+
+            baby.CurrentWeightKg = latestRecord.WeightKg;
+            baby.CurrentHeightCm = latestRecord.HeightCm;
 
             _babyRepo.Update(baby);
             await _babyRepo.SaveChangesAsync();
 
             var evaluation = _businessRuleEngine.VerifyBabyGrowth(
-                (int)((DateTime.UtcNow - baby.DateOfBirth).TotalDays / 30),
+                Math.Max(0, (int)((record.RecordedAt - baby.DateOfBirth).TotalDays / 30.44)),
                 baby.Gender.ToString(),
-                baby.CurrentWeightKg ?? 0f,
+                record.WeightKg,
                 record.HeightCm
             );
 
             return ApiResponse<GrowthEvaluationResult>.SuccessResult(evaluation, "Ghi nhận chỉ số tăng trưởng và đánh giá thành công.");
+        }
+
+        public async Task<ApiResponse<object>> DeleteGrowthRecordAsync(string userId, int babyId, int recordId)
+        {
+            var baby = await _babyRepo.FirstOrDefaultAsync(b => b.Id == babyId && b.UserId == userId);
+            if (baby == null)
+            {
+                return ApiResponse<object>.FailureResult("Không tìm thấy hồ sơ của bé.");
+            }
+
+            var record = await _growthRepo.FirstOrDefaultAsync(g => g.Id == recordId && g.BabyProfileId == babyId);
+            if (record == null)
+            {
+                return ApiResponse<object>.FailureResult("Không tìm thấy chỉ số tăng trưởng.");
+            }
+
+            _growthRepo.Remove(record);
+            await _growthRepo.SaveChangesAsync();
+
+            // Cập nhật lại cân nặng/chiều cao hiện tại của bé dựa trên chỉ số mới nhất còn lại
+            var remainingRecords = (await _growthRepo.FindAsync(g => g.BabyProfileId == babyId))
+                .OrderByDescending(g => g.RecordedAt)
+                .ToList();
+
+            if (remainingRecords.Any())
+            {
+                var latest = remainingRecords.First();
+                baby.CurrentWeightKg = latest.WeightKg;
+                baby.CurrentHeightCm = latest.HeightCm;
+            }
+            else
+            {
+                baby.CurrentWeightKg = null;
+                baby.CurrentHeightCm = null;
+            }
+
+            _babyRepo.Update(baby);
+            await _babyRepo.SaveChangesAsync();
+
+            return ApiResponse<object>.SuccessResult(null!, "Xóa chỉ số tăng trưởng thành công.");
         }
 
         public async Task<ApiResponse<BabyProfile>> UpdateBabyProfileAsync(string userId, int id, BabyProfile profile)

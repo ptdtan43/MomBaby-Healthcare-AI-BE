@@ -72,6 +72,20 @@ namespace MomOi.API.Controllers
         }
 
         /// <summary>
+        /// Deletes a specific growth milestone record.
+        /// </summary>
+        [HttpDelete("{id}/growth/{recordId}")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> DeleteGrowth(int id, int recordId)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            var response = await _babyService.DeleteGrowthRecordAsync(userId, id, recordId);
+            return response.Success ? Ok(response) : BadRequest(response);
+        }
+
+        /// <summary>
         /// Updates an existing baby profile.
         /// </summary>
         [HttpPut("{id}")]
