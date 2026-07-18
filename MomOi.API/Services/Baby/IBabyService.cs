@@ -12,5 +12,6 @@ namespace MomOi.API.Services.Baby
         Task<ApiResponse<List<BabyProfile>>> GetBabyProfilesAsync(string userId);
         Task<ApiResponse<GrowthEvaluationResult>> LogGrowthAsync(string userId, int babyId, GrowthRecord record);
         Task<ApiResponse<BabyProfile>> UpdateBabyProfileAsync(string userId, int id, BabyProfile profile);
+        Task<ApiResponse<object>> DeleteGrowthRecordAsync(string userId, int babyId, int recordId);
     }
 }
