@@ -328,7 +328,7 @@ namespace MomOi.API.Services.AI
         {
             if (score >= 13)
             {
-                return "Mami ơi, điểm đánh giá của mami là khá cao ({score}/30). Hành trình sau sinh đầy thử thách và những xáo trộn tâm lý là điều hoàn toàn tự nhiên. Mami đừng chịu đựng một mình nha, hãy chia sẻ cùng gia đình hoặc kết nối với chuyên gia hỗ trợ của MomOi nhé. Yêu thương và ôm mami thật chặt 💙.";
+                return $"Mami ơi, điểm đánh giá của mami là khá cao ({score}/30). Hành trình sau sinh đầy thử thách và những xáo trộn tâm lý là điều hoàn toàn tự nhiên. Mami đừng chịu đựng một mình nha, hãy chia sẻ cùng gia đình hoặc kết nối với chuyên gia hỗ trợ của MomOi nhé. Yêu thương và ôm mami thật chặt 💙.";
             }
             else if (score >= 9)
             {
