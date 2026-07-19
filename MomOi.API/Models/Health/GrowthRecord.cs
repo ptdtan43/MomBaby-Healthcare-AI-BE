@@ -15,7 +15,8 @@ namespace MomOi.API.Models.Health
         /// <summary>
         /// Navigation property to BabyProfile.
         /// </summary>
-        public BabyProfile BabyProfile { get; set; } = null!;
+        [System.Text.Json.Serialization.JsonIgnore]
+        public BabyProfile? BabyProfile { get; set; }
 
         /// <summary>
         /// Date when metrics were recorded.
