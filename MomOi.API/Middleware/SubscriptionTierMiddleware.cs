@@ -43,7 +43,7 @@ namespace MomOi.API.Middleware
             {
                 // Verify user claims
                 var user = context.User;
-                if (user == null || !user.Identity?.IsAuthenticated == true)
+                if (user == null || user.Identity?.IsAuthenticated != true)
                 {
                     context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                     context.Response.ContentType = "application/json";
