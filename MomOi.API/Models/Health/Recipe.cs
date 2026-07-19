@@ -16,6 +16,17 @@ namespace MomOi.API.Models.Health
     }
 
     /// <summary>
+    /// Category of the recipe — distinguishes Mom recipes from Baby recipes.
+    /// </summary>
+    public enum RecipeCategory
+    {
+        /// <summary>Recipes designed for pregnant/postpartum mothers.</summary>
+        Mom = 0,
+        /// <summary>Recipes designed for babies (weaning / complementary feeding).</summary>
+        Baby = 1
+    }
+
+    /// <summary>
     /// A maternal recipe including ingredients, cooking steps, and nutrition info.
     /// Maps from MongoDB Recipe schema.
     /// Stage-specific for pre-natal, pregnant, or post-natal mothers.
@@ -27,6 +38,9 @@ namespace MomOi.API.Models.Health
 
         /// <summary>Maternal journey stage: "pre-natal", "pregnant", "post-natal".</summary>
         public string ProfileStage { get; set; } = string.Empty;
+
+        /// <summary>Category: Mom (default) or Baby.</summary>
+        public RecipeCategory Category { get; set; } = RecipeCategory.Mom;
 
         public string Title { get; set; } = string.Empty;
 

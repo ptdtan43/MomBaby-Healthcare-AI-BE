@@ -16,24 +16,40 @@ namespace MomOi.API.Services.Baby
         private readonly IGenericRepository<GrowthRecord> _growthRepo;
         private readonly IBusinessRuleEngine _businessRuleEngine;
         private readonly Nutrition.NutritionProxyService _nutritionProxy;
+        private readonly IGenericRepository<MomOi.API.Models.Health.Recipe> _recipeRepo;
 
         public BabyService(
             IGenericRepository<BabyProfile> babyRepo,
             IGenericRepository<GrowthRecord> growthRepo,
             IBusinessRuleEngine businessRuleEngine,
-            Nutrition.NutritionProxyService nutritionProxy)
+            Nutrition.NutritionProxyService nutritionProxy,
+            IGenericRepository<MomOi.API.Models.Health.Recipe> recipeRepo)
         {
             _babyRepo = babyRepo;
             _growthRepo = growthRepo;
             _businessRuleEngine = businessRuleEngine;
             _nutritionProxy = nutritionProxy;
+            _recipeRepo = recipeRepo;
         }
+
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, object> _dailyMenuCache = new();
 
         public async Task<ApiResponse<object>> GetBabyMenuAsync(string userId, int babyId, bool weekly)
         {
             var baby = await _babyRepo.FirstOrDefaultAsync(b => b.Id == babyId && b.UserId == userId);
             if (baby == null)
                 return ApiResponse<object>.FailureResult("Không tìm thấy hồ sơ bé.");
+
+            string cacheKey = "";
+            if (!weekly)
+            {
+                var todayStr = DateTime.UtcNow.ToString("yyyy-MM-dd");
+                cacheKey = $"{userId}_{babyId}_{todayStr}";
+                if (_dailyMenuCache.TryGetValue(cacheKey, out var cachedMenu))
+                {
+                    return ApiResponse<object>.SuccessResult(cachedMenu, "Lấy thực đơn cho bé thành công.");
+                }
+            }
 
             var menu = weekly
                 ? await _nutritionProxy.GetBabyWeeklyMenuAsync(baby.AgeMonths, baby.CurrentWeightKg, baby.Allergies)
@@ -42,6 +58,55 @@ namespace MomOi.API.Services.Baby
             if (menu == null)
                 return ApiResponse<object>.FailureResult(
                     "Dịch vụ dinh dưỡng (Nutrition API) hiện không khả dụng. Vui lòng thử lại sau.");
+
+            // Cập nhật cache nếu là daily menu
+            if (!weekly && menu != null)
+            {
+                _dailyMenuCache[cacheKey] = menu;
+            }
+
+            // Thêm logic tự động lưu vào Database để chuyên gia có thể duyệt
+            if (!weekly && menu != null)
+            {
+                try
+                {
+                    var today = DateTime.UtcNow.Date;
+                    var existingRecipes = await _recipeRepo.FindAsync(r => r.UserId == userId && r.Category == RecipeCategory.Baby && r.GeneratedAt.Date == today);
+                    if (!existingRecipes.Any())
+                    {
+                        var json = System.Text.Json.JsonSerializer.Serialize(menu);
+                        using var doc = System.Text.Json.JsonDocument.Parse(json);
+                        if (doc.RootElement.TryGetProperty("meals", out var meals))
+                        {
+                            foreach (var mealProp in meals.EnumerateObject())
+                            {
+                                var mealObj = mealProp.Value;
+                                var mealName = mealObj.TryGetProperty("name_vi", out var nameEl) ? nameEl.GetString() : "Thực đơn cho bé";
+                                var calories = mealObj.TryGetProperty("total_calories", out var calEl) ? calEl.GetSingle() : 0;
+                                
+                                await _recipeRepo.AddAsync(new MomOi.API.Models.Health.Recipe
+                                {
+                                    UserId = userId,
+                                    ProfileStage = "post-natal",
+                                    Category = RecipeCategory.Baby,
+                                    Title = mealName ?? "Thực đơn bé",
+                                    Description = $"Tạo tự động từ AI dinh dưỡng cho bé {baby.AgeMonths} tháng tuổi.",
+                                    Calories = (int)calories,
+                                    Status = RecipeStatus.PendingReview,
+                                    GeneratedAt = DateTime.UtcNow,
+                                    CreatedAt = DateTime.UtcNow,
+                                    UpdatedAt = DateTime.UtcNow
+                                });
+                            }
+                            await _recipeRepo.SaveChangesAsync();
+                        }
+                    }
+                }
+                catch (Exception)
+                {
+                    // Lỗi lưu DB không nên chặn user xem thực đơn
+                }
+            }
 
             return ApiResponse<object>.SuccessResult(menu, "Lấy thực đơn cho bé thành công.");
         }

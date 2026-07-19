@@ -33,7 +33,7 @@ namespace MomOi.API.Services.Expert
             var pending = allRecipes.OrderBy(r => r.GeneratedAt)
                 .Select(r => new
                 {
-                    r.Id, r.Title, r.Description, r.ProfileStage,
+                    r.Id, r.Title, r.Description, r.ProfileStage, r.Category,
                     r.Calories, r.Protein, r.Carbs, r.Fat,
                     r.PrepTimeMinutes, r.Difficulty, r.Tags,
                     r.IngredientsJson, r.StepsJson, r.Status, r.GeneratedAt
@@ -42,6 +42,50 @@ namespace MomOi.API.Services.Expert
 
             return ApiResponse<object>.SuccessResult(pending,
                 $"Có {pending.Count} công thức đang chờ xét duyệt.");
+        }
+
+        /// <summary>
+        /// Returns ALL recipes (pending, approved, rejected) with category info.
+        /// Expert dashboard uses this to show two tables: Mom recipes and Baby recipes.
+        /// Approved recipes appear first (with checkmark), then pending, then rejected.
+        /// </summary>
+        public async Task<ApiResponse<object>> GetAllRecipesAsync()
+        {
+            var allRecipes = await _unitOfWork.Repository<MomOi.API.Models.Health.Recipe>()
+                .FindAsync(r => r.Status != RecipeStatus.Rejected);
+
+            var result = allRecipes
+                .OrderByDescending(r => r.Status == RecipeStatus.Approved)
+                .ThenBy(r => r.GeneratedAt)
+                .Select(r => new
+                {
+                    r.Id, r.Title, r.Description, r.ProfileStage,
+                    r.Category,
+                    r.Calories, r.Protein, r.Carbs, r.Fat,
+                    r.PrepTimeMinutes, r.Difficulty, r.Tags,
+                    r.IngredientsJson, r.StepsJson,
+                    r.Status,
+                    r.ExpertNote, r.ReviewedAt, r.GeneratedAt
+                })
+                .ToList()
+                .Select(r => new
+                {
+                    r.Id, r.Title, r.Description, r.ProfileStage,
+                    Category = r.Category.ToString(),
+                    r.Calories, r.Protein, r.Carbs, r.Fat,
+                    r.PrepTimeMinutes, r.Difficulty, r.Tags,
+                    r.IngredientsJson, r.StepsJson,
+                    Status = r.Status.ToString(),
+                    r.ExpertNote, r.ReviewedAt, r.GeneratedAt
+                })
+                .ToList();
+
+            var momRecipes = result.Where(r => r.Category == "Mom").ToList();
+            var babyRecipes = result.Where(r => r.Category == "Baby").ToList();
+
+            return ApiResponse<object>.SuccessResult(
+                new { momRecipes, babyRecipes },
+                $"Tổng {result.Count} công thức ({momRecipes.Count} cho mẹ, {babyRecipes.Count} cho bé).");
         }
 
         public async Task<ApiResponse<object>> ReviewRecipeAsync(int recipeId, string expertId, ReviewRecipeDto dto)

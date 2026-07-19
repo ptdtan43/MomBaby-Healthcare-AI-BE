@@ -9,6 +9,9 @@ namespace MomOi.API.Services.Expert
         /// <summary>Get all recipes with PendingReview status for Expert to review.</summary>
         Task<ApiResponse<object>> GetPendingRecipesAsync();
 
+        /// <summary>Get ALL recipes (pending + approved) grouped by category (Mom/Baby) for expert dashboard.</summary>
+        Task<ApiResponse<object>> GetAllRecipesAsync();
+
         /// <summary>Approve or reject a recipe by ID.</summary>
         Task<ApiResponse<object>> ReviewRecipeAsync(int recipeId, string expertId, ReviewRecipeDto dto);
 

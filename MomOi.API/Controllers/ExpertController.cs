@@ -40,6 +40,18 @@ namespace MomOi.API.Controllers
         }
 
         /// <summary>
+        /// Get all recipes (pending + approved) grouped by category (Mom / Baby).
+        /// Used by the Expert dashboard to show two separate tables.
+        /// </summary>
+        [HttpGet("recipes/all")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetAllRecipes()
+        {
+            var response = await _expertService.GetAllRecipesAsync();
+            return Ok(response);
+        }
+
+        /// <summary>
         /// Approve or reject a recipe. Provide IsApproved=true to approve, false to reject with a Note.
         /// </summary>
         [HttpPatch("recipes/{recipeId:int}/review")]
