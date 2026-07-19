@@ -60,12 +60,12 @@ namespace MomOi.API.Services.Baby
                     "Dịch vụ dinh dưỡng (Nutrition API) hiện không khả dụng. Vui lòng thử lại sau.");
 
             // Thêm logic tự động lưu vào Database để chuyên gia có thể duyệt và ánh xạ trạng thái
-            if (!weekly && menu != null)
+            if (menu != null)
             {
                 try
                 {
                     var today = DateTime.UtcNow.Date;
-                    var existingRecipes = await _recipeRepo.FindAsync(r => r.UserId == userId && r.Category == RecipeCategory.Baby && r.GeneratedAt.Date == today);
+                    var existingRecipes = await _recipeRepo.FindAsync(r => r.UserId == userId && r.Category == RecipeCategory.Baby && r.GeneratedAt >= today);
                     
                     var existingList = existingRecipes.ToList();
                     
@@ -73,7 +73,10 @@ namespace MomOi.API.Services.Baby
                     {
                         var json = System.Text.Json.JsonSerializer.Serialize(menu);
                         using var doc = System.Text.Json.JsonDocument.Parse(json);
-                        if (doc.RootElement.TryGetProperty("meals", out var meals))
+                        
+                        var recipesToAdd = new List<MomOi.API.Models.Health.Recipe>();
+                        
+                        void AddMeals(System.Text.Json.JsonElement meals, string dayPrefix)
                         {
                             foreach (var mealProp in meals.EnumerateObject())
                             {
@@ -86,7 +89,7 @@ namespace MomOi.API.Services.Baby
                                     UserId = userId,
                                     ProfileStage = "post-natal",
                                     Category = RecipeCategory.Baby,
-                                    Title = mealName ?? "Thực đơn bé",
+                                    Title = string.IsNullOrEmpty(dayPrefix) ? (mealName ?? "Thực đơn bé") : $"{dayPrefix}: {mealName ?? "Thực đơn bé"}",
                                     Description = $"Tạo tự động từ AI dinh dưỡng cho bé {baby.AgeMonths} tháng tuổi.",
                                     Calories = (int)calories,
                                     Status = RecipeStatus.PendingReview,
@@ -94,16 +97,64 @@ namespace MomOi.API.Services.Baby
                                     CreatedAt = DateTime.UtcNow,
                                     UpdatedAt = DateTime.UtcNow
                                 };
-                                await _recipeRepo.AddAsync(newRecipe);
-                                existingList.Add(newRecipe); // Add to local list for status mapping
+                                recipesToAdd.Add(newRecipe);
+                                existingList.Add(newRecipe);
                             }
-                            await _recipeRepo.SaveChangesAsync();
                         }
+
+                        if (weekly)
+                        {
+                            if (doc.RootElement.TryGetProperty("days", out var days))
+                            {
+                                foreach (var day in days.EnumerateArray())
+                                {
+                                    var dayName = day.TryGetProperty("day", out var dName) ? dName.GetString() : "";
+                                    if (day.TryGetProperty("meals", out var meals))
+                                    {
+                                        AddMeals(meals, dayName);
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            if (doc.RootElement.TryGetProperty("meals", out var meals))
+                            {
+                                AddMeals(meals, "");
+                            }
+                        }
+
+                        foreach (var r in recipesToAdd)
+                        {
+                            await _recipeRepo.AddAsync(r);
+                        }
+                        await _recipeRepo.SaveChangesAsync();
                     }
 
                     // Map status to the menu object
                     var jsonNode = System.Text.Json.JsonSerializer.SerializeToNode(menu);
-                    if (jsonNode?["meals"] is System.Text.Json.Nodes.JsonObject mealsNode)
+                    
+                    if (weekly && jsonNode?["days"] is System.Text.Json.Nodes.JsonArray daysNode)
+                    {
+                        foreach (var dayNode in daysNode)
+                        {
+                            var dName = dayNode?["day"]?.ToString() ?? "";
+                            if (dayNode?["meals"] is System.Text.Json.Nodes.JsonObject mealsNode)
+                            {
+                                foreach (var mealProp in mealsNode)
+                                {
+                                    var mealName = mealProp.Value?["name_vi"]?.ToString();
+                                    var fullTitle = string.IsNullOrEmpty(dName) ? mealName : $"{dName}: {mealName}";
+                                    var matchingRecipe = existingList.FirstOrDefault(r => r.Title == fullTitle);
+                                    if (matchingRecipe != null && mealProp.Value is System.Text.Json.Nodes.JsonObject singleMealNode)
+                                    {
+                                        singleMealNode["status"] = (int)matchingRecipe.Status;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else if (!weekly && jsonNode?["meals"] is System.Text.Json.Nodes.JsonObject mealsNode)
                     {
                         foreach (var mealProp in mealsNode)
                         {

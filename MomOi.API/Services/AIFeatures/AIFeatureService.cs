@@ -63,18 +63,19 @@ namespace MomOi.API.Services.AIFeatures
             var savedCount = 0;
             foreach (var item in recipesArray.EnumerateArray())
             {
-                var title = item.TryGetProperty("recipe", out var titleEl) ? titleEl.GetString() : null;
+                var title = (item.TryGetProperty("recipe", out var titleEl) || item.TryGetProperty("Recipe", out titleEl) || item.TryGetProperty("title", out titleEl) || item.TryGetProperty("Title", out titleEl)) 
+                    ? titleEl.GetString() : null;
                 if (string.IsNullOrWhiteSpace(title)) continue;
 
-                var calories = item.TryGetProperty("calories", out var calEl) && calEl.ValueKind == JsonValueKind.Number
+                var calories = (item.TryGetProperty("calories", out var calEl) || item.TryGetProperty("Calories", out calEl)) && calEl.ValueKind == JsonValueKind.Number
                     ? calEl.GetInt32() : 0;
 
                 var ingredients = new List<string>();
-                if (item.TryGetProperty("ingredients", out var ingEl) && ingEl.ValueKind == JsonValueKind.Array)
+                if ((item.TryGetProperty("ingredients", out var ingEl) || item.TryGetProperty("Ingredients", out ingEl)) && ingEl.ValueKind == JsonValueKind.Array)
                     foreach (var i in ingEl.EnumerateArray()) ingredients.Add(i.GetString() ?? "");
 
                 var steps = new List<string>();
-                if (item.TryGetProperty("steps", out var stepEl) && stepEl.ValueKind == JsonValueKind.Array)
+                if ((item.TryGetProperty("steps", out var stepEl) || item.TryGetProperty("Steps", out stepEl)) && stepEl.ValueKind == JsonValueKind.Array)
                     foreach (var s in stepEl.EnumerateArray()) steps.Add(s.GetString() ?? "");
 
                 await _recipeRepo.AddAsync(new RecipeEntity
