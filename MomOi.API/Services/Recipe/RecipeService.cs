@@ -16,10 +16,12 @@ namespace MomOi.API.Services.Recipe
             _unitOfWork = unitOfWork;
         }
 
-        public async Task<ApiResponse<object>> GetMyRecipesAsync(string userId, bool? isSaved, int page = 1, int limit = 20)
+        public async Task<ApiResponse<object>> GetMyRecipesAsync(string userId, bool? isSaved, MomOi.API.Models.Health.RecipeCategory? category = null, int page = 1, int limit = 20)
         {
             var all = await _unitOfWork.Repository<MomOi.API.Models.Health.Recipe>()
-                .FindAsync(r => r.UserId == userId && (!isSaved.HasValue || r.IsSaved == isSaved.Value));
+                .FindAsync(r => r.UserId == userId 
+                    && (!isSaved.HasValue || r.IsSaved == isSaved.Value)
+                    && (!category.HasValue || r.Category == category.Value));
 
             var total = all.Count();
             var recipes = all

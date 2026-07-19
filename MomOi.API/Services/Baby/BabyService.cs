@@ -59,20 +59,17 @@ namespace MomOi.API.Services.Baby
                 return ApiResponse<object>.FailureResult(
                     "Dịch vụ dinh dưỡng (Nutrition API) hiện không khả dụng. Vui lòng thử lại sau.");
 
-            // Cập nhật cache nếu là daily menu
-            if (!weekly && menu != null)
-            {
-                _dailyMenuCache[cacheKey] = menu;
-            }
-
-            // Thêm logic tự động lưu vào Database để chuyên gia có thể duyệt
+            // Thêm logic tự động lưu vào Database để chuyên gia có thể duyệt và ánh xạ trạng thái
             if (!weekly && menu != null)
             {
                 try
                 {
                     var today = DateTime.UtcNow.Date;
                     var existingRecipes = await _recipeRepo.FindAsync(r => r.UserId == userId && r.Category == RecipeCategory.Baby && r.GeneratedAt.Date == today);
-                    if (!existingRecipes.Any())
+                    
+                    var existingList = existingRecipes.ToList();
+                    
+                    if (!existingList.Any())
                     {
                         var json = System.Text.Json.JsonSerializer.Serialize(menu);
                         using var doc = System.Text.Json.JsonDocument.Parse(json);
@@ -84,7 +81,7 @@ namespace MomOi.API.Services.Baby
                                 var mealName = mealObj.TryGetProperty("name_vi", out var nameEl) ? nameEl.GetString() : "Thực đơn cho bé";
                                 var calories = mealObj.TryGetProperty("total_calories", out var calEl) ? calEl.GetSingle() : 0;
                                 
-                                await _recipeRepo.AddAsync(new MomOi.API.Models.Health.Recipe
+                                var newRecipe = new MomOi.API.Models.Health.Recipe
                                 {
                                     UserId = userId,
                                     ProfileStage = "post-natal",
@@ -96,11 +93,32 @@ namespace MomOi.API.Services.Baby
                                     GeneratedAt = DateTime.UtcNow,
                                     CreatedAt = DateTime.UtcNow,
                                     UpdatedAt = DateTime.UtcNow
-                                });
+                                };
+                                await _recipeRepo.AddAsync(newRecipe);
+                                existingList.Add(newRecipe); // Add to local list for status mapping
                             }
                             await _recipeRepo.SaveChangesAsync();
                         }
                     }
+
+                    // Map status to the menu object
+                    var jsonNode = System.Text.Json.JsonSerializer.SerializeToNode(menu);
+                    if (jsonNode?["meals"] is System.Text.Json.Nodes.JsonObject mealsNode)
+                    {
+                        foreach (var mealProp in mealsNode)
+                        {
+                            var mealName = mealProp.Value?["name_vi"]?.ToString();
+                            var matchingRecipe = existingList.FirstOrDefault(r => r.Title == mealName);
+                            if (matchingRecipe != null && mealProp.Value is System.Text.Json.Nodes.JsonObject singleMealNode)
+                            {
+                                singleMealNode["status"] = (int)matchingRecipe.Status;
+                            }
+                        }
+                    }
+                    
+                    // Return the modified JSON and update cache
+                    menu = jsonNode;
+                    _dailyMenuCache[cacheKey] = menu;
                 }
                 catch (Exception)
                 {

@@ -29,12 +29,12 @@ namespace MomOi.API.Controllers
         /// </summary>
         [HttpGet("my")]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetMyRecipes([FromQuery] bool? isSaved, [FromQuery] int page = 1, [FromQuery] int limit = 20)
+        public async Task<IActionResult> GetMyRecipes([FromQuery] bool? isSaved, [FromQuery] MomOi.API.Models.Health.RecipeCategory? category, [FromQuery] int page = 1, [FromQuery] int limit = 20)
         {
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId)) return Unauthorized();
 
-            var response = await _recipeService.GetMyRecipesAsync(userId, isSaved, page, limit);
+            var response = await _recipeService.GetMyRecipesAsync(userId, isSaved, category, page, limit);
             return response.Success ? Ok(response) : BadRequest(response);
         }
 
