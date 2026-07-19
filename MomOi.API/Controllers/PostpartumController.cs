@@ -2,8 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using MomOi.API.DTOs;
-using MomOi.API.Middleware;
-using MomOi.API.Models.Identity;
+
 using MomOi.API.Services.AI;
 using MomOi.API.Services.Postpartum;
 using System;
@@ -54,10 +53,9 @@ namespace MomOi.API.Controllers
         }
 
         /// <summary>
-        /// Submits answers to the 10 EPDS questions. Triggers BR05 rule evaluation and returns Gemini generated empathetic messages. Gated under the Modern Mom tier.
+        /// Submits answers to the 10 EPDS questions. Triggers BR05 rule evaluation and returns Gemini generated empathetic messages.
         /// </summary>
         [HttpPost("epds")]
-        [RequiresTier(SubscriptionTier.MomHienDai)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
         public async Task<IActionResult> SubmitEpds([FromBody] EpdsRequest request)
         {
@@ -75,10 +73,9 @@ namespace MomOi.API.Controllers
         }
 
         /// <summary>
-        /// Analyzes a spoken audio journal entry using Gemini 1.5 Pro multimodal capabilities. Gated under Super Mom VIP.
+        /// Analyzes a spoken audio journal entry using Gemini 1.5 Pro multimodal capabilities.
         /// </summary>
         [HttpPost("epds/voice-journal")]
-        [RequiresTier(SubscriptionTier.SuperMomVip)]
         [ProducesResponseType(typeof(ApiResponse<VoiceJournalResult>), StatusCodes.Status200OK)]
         public async Task<IActionResult> AnalyzeVoiceJournal([FromBody] VoiceJournalRequest request)
         {
