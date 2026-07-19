@@ -15,15 +15,35 @@ namespace MomOi.API.Services.Baby
         private readonly IGenericRepository<BabyProfile> _babyRepo;
         private readonly IGenericRepository<GrowthRecord> _growthRepo;
         private readonly IBusinessRuleEngine _businessRuleEngine;
+        private readonly Nutrition.NutritionProxyService _nutritionProxy;
 
         public BabyService(
             IGenericRepository<BabyProfile> babyRepo,
             IGenericRepository<GrowthRecord> growthRepo,
-            IBusinessRuleEngine businessRuleEngine)
+            IBusinessRuleEngine businessRuleEngine,
+            Nutrition.NutritionProxyService nutritionProxy)
         {
             _babyRepo = babyRepo;
             _growthRepo = growthRepo;
             _businessRuleEngine = businessRuleEngine;
+            _nutritionProxy = nutritionProxy;
+        }
+
+        public async Task<ApiResponse<object>> GetBabyMenuAsync(string userId, int babyId, bool weekly)
+        {
+            var baby = await _babyRepo.FirstOrDefaultAsync(b => b.Id == babyId && b.UserId == userId);
+            if (baby == null)
+                return ApiResponse<object>.FailureResult("Không tìm thấy hồ sơ bé.");
+
+            var menu = weekly
+                ? await _nutritionProxy.GetBabyWeeklyMenuAsync(baby.AgeMonths, baby.CurrentWeightKg, baby.Allergies)
+                : await _nutritionProxy.GetBabyDailyMenuAsync(baby.AgeMonths, baby.CurrentWeightKg, baby.Allergies);
+
+            if (menu == null)
+                return ApiResponse<object>.FailureResult(
+                    "Dịch vụ dinh dưỡng (Nutrition API) hiện không khả dụng. Vui lòng thử lại sau.");
+
+            return ApiResponse<object>.SuccessResult(menu, "Lấy thực đơn cho bé thành công.");
         }
 
         public async Task<ApiResponse<BabyProfile>> CreateBabyProfileAsync(string userId, BabyProfile profile)

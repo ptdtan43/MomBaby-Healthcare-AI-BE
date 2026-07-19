@@ -156,25 +156,18 @@ YÊU CẦU ĐẦU RA (Chỉ trả về chuỗi JSON Array nguyên bản, KHÔNG 
   }}
 ]";
 
-            string aiResponseJson = "";
+            string aiResponseJson;
             try
             {
                 aiResponseJson = await _geminiService.GenerateJsonAsync(
                     "Bạn là chuyên gia dinh dưỡng nhi khoa hàng đầu.\n\n" + prompt);
-                var jsonDoc = JsonDocument.Parse(aiResponseJson);
+                JsonDocument.Parse(aiResponseJson); // validate before persisting
             }
             catch (Exception)
             {
-                aiResponseJson = @"[
-                  {
-                    ""day"": ""Ngày 1"",
-                    ""meals"": [
-                      { ""mealType"": ""Sáng"", ""recipe"": ""Cháo yến mạch cá hồi"", ""calories"": 180 },
-                      { ""mealType"": ""Trưa"", ""recipe"": ""Súp bí đỏ thịt băm"", ""calories"": 250 },
-                      { ""mealType"": ""Tối"", ""recipe"": ""Cơm nát cá kho tộ"", ""calories"": 220 }
-                    ]
-                  }
-                ]";
+                // No fabricated fallback plan: fail honestly so the client can retry.
+                return ApiResponse<object>.FailureResult(
+                    "AI hiện không thể tạo thực đơn. Vui lòng thử lại sau.");
             }
 
             var plan = new DietPlan
@@ -190,7 +183,7 @@ YÊU CẦU ĐẦU RA (Chỉ trả về chuỗi JSON Array nguyên bản, KHÔNG 
             await _unitOfWork.Repository<DietPlan>().AddAsync(plan);
             await _unitOfWork.SaveChangesAsync();
 
-            return ApiResponse<object>.SuccessResult((object)plan.Id, "Đã tạo thực đơn bằng AI (hoặc dự phòng) thành công.");
+            return ApiResponse<object>.SuccessResult((object)plan.Id, "Đã tạo thực đơn bằng AI thành công.");
         }
 
         // ─── Premium Upgrade ────────────────────────────────────────────────────

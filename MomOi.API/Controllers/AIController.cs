@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using MomOi.API.DTOs;
 using MomOi.API.Services.AIFeatures;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace MomOi.API.Controllers
@@ -30,7 +31,10 @@ namespace MomOi.API.Controllers
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GenerateAIRecipes([FromBody] GenerateAiRecipesRequestDto request)
         {
-            var response = await _aiFeatureService.GenerateAIRecipesAsync(request);
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            var response = await _aiFeatureService.GenerateAIRecipesAsync(userId, request);
             return response.Success ? Ok(response) : BadRequest(response);
         }
     }

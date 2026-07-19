@@ -20,12 +20,10 @@ namespace MomOi.API.Controllers
     public class BabyController : ControllerBase
     {
         private readonly IBabyService _babyService;
-        private readonly Services.Nutrition.NutritionProxyService _nutritionProxy;
 
-        public BabyController(IBabyService babyService, Services.Nutrition.NutritionProxyService nutritionProxy)
+        public BabyController(IBabyService babyService)
         {
             _babyService = babyService;
-            _nutritionProxy = nutritionProxy;
         }
 
         /// <summary>
@@ -53,6 +51,35 @@ namespace MomOi.API.Controllers
             if (string.IsNullOrEmpty(userId)) return Unauthorized();
 
             var response = await _babyService.GetBabyProfilesAsync(userId);
+            return response.Success ? Ok(response) : BadRequest(response);
+        }
+
+        /// <summary>
+        /// Gets today's personalized menu for a baby (allergens excluded, WHO goals applied).
+        /// Proxied to the Python nutrition recommendation engine.
+        /// </summary>
+        [HttpGet("{id}/menu/daily")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetDailyMenu(int id)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            var response = await _babyService.GetBabyMenuAsync(userId, id, weekly: false);
+            return response.Success ? Ok(response) : BadRequest(response);
+        }
+
+        /// <summary>
+        /// Gets a 7-day personalized menu for a baby (allergens excluded, WHO goals applied).
+        /// </summary>
+        [HttpGet("{id}/menu/weekly")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetWeeklyMenu(int id)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            var response = await _babyService.GetBabyMenuAsync(userId, id, weekly: true);
             return response.Success ? Ok(response) : BadRequest(response);
         }
 
@@ -99,56 +126,5 @@ namespace MomOi.API.Controllers
             return response.Success ? Ok(response) : BadRequest(response);
         }
 
-        /// <summary>
-        /// Retrieves the recommended daily menu for a baby from the Python nutrition engine.
-        /// </summary>
-        [HttpGet("{id}/menu/daily")]
-        public async Task<IActionResult> GetDailyMenu(int id)
-        {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId)) return Unauthorized();
-
-            var menu = await _nutritionProxy.GetBabyDailyMenuAsync(id);
-            if (menu == null)
-            {
-                return NotFound(new ApiResponse<object>
-                {
-                    Success = false,
-                    Message = "Không thể tải thực đơn hàng ngày cho bé từ hệ thống AI Dinh dưỡng."
-                });
-            }
-
-            return Ok(new ApiResponse<object>
-            {
-                Success = true,
-                Data = menu
-            });
-        }
-
-        /// <summary>
-        /// Retrieves the recommended weekly menu for a baby from the Python nutrition engine.
-        /// </summary>
-        [HttpGet("{id}/menu/weekly")]
-        public async Task<IActionResult> GetWeeklyMenu(int id)
-        {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId)) return Unauthorized();
-
-            var menu = await _nutritionProxy.GetBabyWeeklyMenuAsync(id);
-            if (menu == null)
-            {
-                return NotFound(new ApiResponse<object>
-                {
-                    Success = false,
-                    Message = "Không thể tải thực đơn hàng tuần cho bé từ hệ thống AI Dinh dưỡng."
-                });
-            }
-
-            return Ok(new ApiResponse<object>
-            {
-                Success = true,
-                Data = menu
-            });
-        }
     }
 }

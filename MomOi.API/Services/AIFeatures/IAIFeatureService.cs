@@ -10,6 +10,10 @@ namespace MomOi.API.Services.AIFeatures
 
     public interface IAIFeatureService
     {
-        Task<ApiResponse<object>> GenerateAIRecipesAsync(GenerateAiRecipesRequestDto request);
+        /// <summary>
+        /// Generates recipes with Gemini AND persists them as PendingReview so the
+        /// Expert can approve/reject them (recipe review workflow).
+        /// </summary>
+        Task<ApiResponse<object>> GenerateAIRecipesAsync(string userId, GenerateAiRecipesRequestDto request);
     }
 }

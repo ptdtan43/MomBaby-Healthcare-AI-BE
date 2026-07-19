@@ -138,36 +138,19 @@ namespace MomOi.API.Services.Pregnancy
         public async Task<ApiResponse<object>> GetMealPlanAsync(string userId, int? week)
         {
             int selectedWeek = week ?? 12;
+
+            // The 7-day plan (dishes + USDA-computed nutrient totals) comes from the
+            // Python nutrition engine. No hardcoded fallback: if the service is down
+            // we report it honestly instead of showing fabricated data.
             var apiResult = await _nutritionProxy.GetMealPlanAsync(selectedWeek);
 
-            if (apiResult != null)
+            if (apiResult == null)
             {
-                return ApiResponse<object>.SuccessResult(apiResult);
+                return ApiResponse<object>.FailureResult(
+                    "Dịch vụ dinh dưỡng (Nutrition API) hiện không khả dụng. Vui lòng thử lại sau.");
             }
 
-            var fallbackPlan = new List<object>();
-            string[] days = { "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy", "Chủ Nhật" };
-            foreach (var day in days)
-            {
-                fallbackPlan.Add(new
-                {
-                    Day = day,
-                    Breakfast = "Cháo cá hồi nấu hạt sen và 1 ly sữa tiệt trùng",
-                    Lunch = "Cơm gạo lứt, cá kho tộ, canh rau ngót luộc thịt nạc",
-                    Snack = "Sữa chua hoa quả chín",
-                    Dinner = "Cơm tẻ, thịt bò xào súp lơ xanh, canh bí đỏ thịt bằm",
-                    DailyNutrients = new
-                    {
-                        Calories = 2200,
-                        Protein = "85g",
-                        Carbs = "290g",
-                        Fat = "65g",
-                        Iron = "15mg"
-                    }
-                });
-            }
-
-            return ApiResponse<object>.SuccessResult(fallbackPlan, "Trả về thực đơn thai sản chuẩn Việt Nam (Fallback).");
+            return ApiResponse<object>.SuccessResult(apiResult, "Lấy thực đơn thai kỳ thành công.");
         }
 
         public async Task<ApiResponse<object>> LogWeightAsync(string userId, float weightKg, DateTime date)

@@ -3,7 +3,7 @@ from datetime import datetime
 from database import Base
 
 class Ingredient(Base):
-    __tablename__ = "ingredients"
+    __tablename__ = "nutrition_ingredients"
 
     id = Column(Integer, primary_key=True, index=True)
     usda_fdc_id = Column(Integer, unique=True, index=True, nullable=True)

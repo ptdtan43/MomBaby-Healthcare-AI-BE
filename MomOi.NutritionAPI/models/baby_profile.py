@@ -3,7 +3,7 @@ from datetime import datetime
 from database import Base
 
 class BabyProfile(Base):
-    __tablename__ = "baby_profiles"
+    __tablename__ = "nutrition_baby_profiles"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String, nullable=False, index=True)  # User ID mapping from SQL Server

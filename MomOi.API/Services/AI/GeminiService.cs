@@ -266,7 +266,8 @@ namespace MomOi.API.Services.AI
                              $"Trả về ĐÚNG MỘT khối JSON MẢNG (Array) hợp lệ theo cấu trúc sau (không bao gồm markdown ```json hay bất kỳ văn bản nào khác):\n" +
                              $"[\n  {{\n    \"recipe\": \"Tên món ăn 1\",\n    \"calories\": 350,\n    \"ingredients\": [\"Nguyên liệu 1\"],\n    \"steps\": [\"Bước 1\"],\n    \"youtubeLink\": \"\"\n  }}\n]";
 
-                return await CallGeminiTextApiAsync(prompt);
+                // jsonMode ép model trả JSON thuần (không code fence) để caller parse trực tiếp.
+                return await CallGeminiTextApiAsync(prompt, jsonMode: true);
             }
             catch (Exception ex)
             {

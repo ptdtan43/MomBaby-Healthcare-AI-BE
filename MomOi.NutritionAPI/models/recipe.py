@@ -4,7 +4,7 @@ from datetime import datetime
 from database import Base
 
 class Recipe(Base):
-    __tablename__ = "recipes"
+    __tablename__ = "nutrition_recipes"
 
     id = Column(Integer, primary_key=True, index=True)
     name_vi = Column(String, nullable=False, index=True)
@@ -39,11 +39,11 @@ class Recipe(Base):
 
 
 class RecipeIngredient(Base):
-    __tablename__ = "recipe_ingredients"
+    __tablename__ = "nutrition_recipe_ingredients"
 
     id = Column(Integer, primary_key=True, index=True)
-    recipe_id = Column(Integer, ForeignKey("recipes.id", ondelete="CASCADE"), nullable=False)
-    ingredient_id = Column(Integer, ForeignKey("ingredients.id"), nullable=False)
+    recipe_id = Column(Integer, ForeignKey("nutrition_recipes.id", ondelete="CASCADE"), nullable=False)
+    ingredient_id = Column(Integer, ForeignKey("nutrition_ingredients.id"), nullable=False)
     weight_grams = Column(Float, nullable=False)
 
     # Relationships

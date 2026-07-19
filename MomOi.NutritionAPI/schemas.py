@@ -164,6 +164,16 @@ class DailyMenu(BaseModel):
     nutrition_totals: Dict[str, float]
     coverage_pct: Dict[str, float]
     meets_80pct: bool
+    # WHO daily goals for this baby (age/weight personalized) so clients can
+    # display real targets and compute per-nutrient coverage.
+    goals: Optional[DailyGoals] = None
 
 class WeeklyMenu(BaseModel):
     days: List[DailyMenu]
+
+class MenuRecommendRequest(BaseModel):
+    """Baby info sent by the .NET API (owner of baby profiles) so this service
+    can recommend menus without reading the .NET-owned baby_profiles table."""
+    age_months: int
+    weight_kg: Optional[float] = None
+    allergies: List[str] = []

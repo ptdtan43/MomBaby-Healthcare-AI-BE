@@ -13,7 +13,7 @@ from schemas import (
     NutrientData, IngestionRequest, IngestionResult,
     BabyProfileCreate, BabyProfileUpdate, BabyProfileResponse,
     RecipeCreate, RecipeResponse, RecipeNutrition, DailyGoals,
-    DailyMenu, WeeklyMenu
+    DailyMenu, WeeklyMenu, MenuRecommendRequest
 )
 from services.usda_service import fetch_usda_nutrients, bulk_ingest_ingredients
 from services.who_nutrition_goals import get_daily_goals
@@ -70,6 +70,37 @@ async def get_ingredient_usda_live(name_en: str):
             detail=f"Ingredient '{name_en}' not found in USDA Database."
         )
     return data
+
+
+@app.get("/api/nutrition/meal-plan")
+async def get_prenatal_meal_plan(week: int = Query(12, ge=1, le=42), db: Session = Depends(get_db)):
+    """7-day maternal (prenatal) meal plan for the given pregnancy week.
+    Daily nutrient totals are computed from the USDA-backed ingredients table."""
+    from services.prenatal_meal_plans import build_prenatal_meal_plan
+    return build_prenatal_meal_plan(week, db)
+
+
+# --- Menu recommendation for a baby described in the request body ---
+# The .NET API owns baby profiles (its baby_profiles schema differs from this
+# service's model), so it sends age/weight/allergies instead of a baby_id.
+
+def _transient_baby(req: MenuRecommendRequest):
+    from types import SimpleNamespace
+    return SimpleNamespace(
+        age_months=req.age_months,
+        current_weight_kg=req.weight_kg,
+        allergies=req.allergies or [],
+    )
+
+
+@app.post("/api/menu/daily", response_model=DailyMenu)
+async def recommend_daily_for_payload(req: MenuRecommendRequest, db: Session = Depends(get_db)):
+    return recommend_daily_menu(_transient_baby(req), db)
+
+
+@app.post("/api/menu/weekly", response_model=WeeklyMenu)
+async def recommend_weekly_for_payload(req: MenuRecommendRequest, db: Session = Depends(get_db)):
+    return recommend_weekly_menu(_transient_baby(req), db)
 
 
 # --- Baby Profile Endpoints ---

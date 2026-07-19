@@ -206,7 +206,8 @@ def recommend_daily_menu(
         meals=meals_response,
         nutrition_totals=totals,
         coverage_pct=coverage,
-        meets_80pct=meets_80pct
+        meets_80pct=meets_80pct,
+        goals=goals
     )
 
 def recommend_weekly_menu(baby: BabyProfile, db: Session) -> WeeklyMenu:
