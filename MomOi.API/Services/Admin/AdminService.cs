@@ -175,33 +175,78 @@ namespace MomOi.API.Services.Admin
 
         public async Task<ApiResponse<object>> GetUsersAtRiskAsync()
         {
-            var highRiskAlerts = await _context.LifestyleAlerts
-                .Where(a => a.Severity == AlertSeverity.High && a.Status == AlertStatus.Pending)
-                .GroupBy(a => a.UserId)
-                .Select(g => new
-                {
-                    UserId = g.Key,
-                    TriggeredRules = g.ToList(),
-                    LatestAlertDate = g.Max(a => a.TriggeredAt)
-                })
+            // Read active logs from CriticalAlertLogs
+            var criticalLogs = await _context.CriticalAlertLogs
+                .Where(c => !c.IsResolved)
                 .ToListAsync();
 
-            var userIds = highRiskAlerts.Select(a => a.UserId).ToList();
-            var latestEntries = await _context.LifestyleEntries
-                .Where(e => userIds.Contains(e.UserId))
-                .GroupBy(e => e.UserId)
-                .Select(g => g.OrderByDescending(e => e.Date).FirstOrDefault())
+            // Read pending alerts from LifestyleAlerts
+            var lifestyleAlerts = await _context.LifestyleAlerts
+                .Where(a => a.Status == AlertStatus.Pending && (a.Severity == AlertSeverity.High || a.Severity == AlertSeverity.Critical))
                 .ToListAsync();
 
-            var result = highRiskAlerts.Select(alert => new
+            // Combine all alert items into a standardized internal representation
+            var combinedAlerts = criticalLogs.Select(c => new
             {
-                userId = alert.UserId,
-                triggeredRules = alert.TriggeredRules.Select(r => new { r.RuleId, r.Title }),
-                healthScore = latestEntries.FirstOrDefault(e => e?.UserId == alert.UserId)?.HealthScore ?? 0,
-                latestAlertDate = alert.LatestAlertDate
-            }).OrderByDescending(r => r.latestAlertDate);
+                c.UserId,
+                Title = c.TitleVi,
+                Message = c.MessageVi,
+                c.Severity,
+                c.TriggeredAt
+            }).Concat(lifestyleAlerts.Select(l => new
+            {
+                l.UserId,
+                l.Title,
+                l.Message,
+                l.Severity,
+                l.TriggeredAt
+            })).ToList();
 
-            return ApiResponse<object>.SuccessResult(result, "Lấy danh sách người dùng có nguy cơ cao thành công.");
+            var userGroups = combinedAlerts.GroupBy(a => a.UserId).ToList();
+            var userIds = userGroups.Select(g => g.Key).ToList();
+
+            var usersMap = await _userManager.Users
+                .Where(u => userIds.Contains(u.Id))
+                .ToDictionaryAsync(u => u.Id, u => new { u.FullName, u.Email });
+
+            var resultList = new System.Collections.Generic.List<object>();
+
+            foreach (var group in userGroups)
+            {
+                var userId = group.Key;
+                usersMap.TryGetValue(userId, out var userInfo);
+
+                var latestAlert = group.OrderByDescending(a => a.TriggeredAt).First();
+
+                // Aggregate distinct alert titles/reasons for this user
+                var distinctReasons = group
+                    .Select(a => string.IsNullOrEmpty(a.Title) ? a.Message : a.Title)
+                    .Distinct()
+                    .ToList();
+
+                string consolidatedReason = string.Join(" • ", distinctReasons);
+
+                // Determine highest severity
+                var highestSeverity = group.Any(g => g.Severity == AlertSeverity.Critical) 
+                    ? AlertSeverity.Critical 
+                    : (group.Any(g => g.Severity == AlertSeverity.High) ? AlertSeverity.High : AlertSeverity.Warning);
+
+                resultList.Add(new
+                {
+                    id = userId,
+                    userId = userId,
+                    fullName = userInfo?.FullName ?? userInfo?.Email ?? "Mẹ bầu",
+                    email = userInfo?.Email ?? "N/A",
+                    alertReason = consolidatedReason,
+                    severity = highestSeverity.ToString().ToUpper(),
+                    updatedAt = latestAlert.TriggeredAt.ToString("yyyy-MM-dd HH:mm")
+                });
+            }
+
+            return ApiResponse<object>.SuccessResult(
+                resultList.OrderByDescending(x => ((dynamic)x).updatedAt), 
+                "Lấy danh sách người dùng có nguy cơ cao thành công."
+            );
         }
 
         public async Task<ApiResponse<object>> GetReportsSummaryAsync()

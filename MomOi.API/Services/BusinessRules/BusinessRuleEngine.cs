@@ -350,28 +350,32 @@ namespace MomOi.API.Services.BusinessRules
                     .OrderByDescending(e => e.TakenAt)
                     .FirstOrDefaultAsync();
 
-                if (latestEpds != null && latestEpds.Answers.Sum() >= 13)
+                if (latestEpds != null && latestEpds.Answers.Sum() >= 9)
                 {
+                    int totalScore = latestEpds.Answers.Sum();
+                    bool isCritical = totalScore >= 13;
                     string empatheticMessage = "Mami ơi, mami không đơn độc đâu nhé. Hãy chia sẻ cùng những người xung quanh mami nha 💙.";
                     if (_geminiService != null)
                     {
                         var profileDesc = $"Mom ID: {profile.UserId}, DeliveryDate: {profile.DeliveryDate:yyyy-MM-dd}";
-                        empatheticMessage = await _geminiService.GenerateEpdsResponseAsync(latestEpds.Answers.Sum(), profileDesc);
+                        empatheticMessage = await _geminiService.GenerateEpdsResponseAsync(totalScore, profileDesc);
                     }
 
                     var alert = new HealthAlert(
                         RuleId: "BR05",
-                        Severity: AlertSeverity.Critical,
-                        TitleVi: "Bạn có thể đang cần hỗ trợ tâm lý 💙",
-                        MessageVi: empatheticMessage,
-                        SuggestionVi: "Đường dây nóng hỗ trợ tâm lý sản phụ: 1900xxxx. Chúng tôi khuyên mami nên gặp bác sĩ sản khoa hoặc chuyên gia tâm lý. Hệ thống đã gửi thông báo đến người liên hệ khẩn cấp của mami.",
+                        Severity: isCritical ? AlertSeverity.Critical : AlertSeverity.Warning,
+                        TitleVi: isCritical ? "Bạn có thể đang cần hỗ trợ tâm lý 💙" : "Dấu hiệu trầm cảm nhẹ (EPDS) 💙",
+                        MessageVi: $"Điểm EPDS: {totalScore}/30. {empatheticMessage}",
+                        SuggestionVi: "Đường dây nóng hỗ trợ tâm lý sản phụ: 1900xxxx. Chúng tôi khuyên mami nên gặp bác sĩ sản khoa hoặc chuyên gia tâm lý.",
                         TriggeredAt: DateTime.UtcNow
                     );
                     alerts.Add(alert);
                     await LogAlertAndPushAsync(profile.UserId, alert);
 
-                    // Mock sending emergency email
-                    _logger?.LogWarning("EMERGENCY: EPDS Depression alert sent to emergency contact of user {UserId}", profile.UserId);
+                    if (isCritical)
+                    {
+                        _logger?.LogWarning("EMERGENCY: EPDS Depression alert sent to emergency contact of user {UserId}", profile.UserId);
+                    }
                 }
             }
 
