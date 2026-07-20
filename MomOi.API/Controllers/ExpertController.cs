@@ -14,7 +14,7 @@ namespace MomOi.API.Controllers
     /// Controller for Expert (Medical Expert / Nutritionist) operations.
     /// Experts review AI-generated recipes and consult assigned Moms.
     /// </summary>
-    [Authorize(Roles = AppRoles.Expert)]
+    [Authorize(Roles = AppRoles.Expert + "," + AppRoles.Staff + "," + AppRoles.Admin)]
     [ApiController]
     [Route("api/expert")]
     public class ExpertController : ControllerBase

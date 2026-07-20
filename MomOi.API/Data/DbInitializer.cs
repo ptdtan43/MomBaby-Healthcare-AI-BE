@@ -26,7 +26,8 @@ namespace MomOi.API.Data
 
             // 2. Seed Admin User
             var adminEmail = "admin@momoi.com";
-            if (await userManager.FindByEmailAsync(adminEmail) == null)
+            var adminUser = await userManager.FindByEmailAsync(adminEmail);
+            if (adminUser == null)
             {
                 var admin = new AppUser
                 {
@@ -43,10 +44,15 @@ namespace MomOi.API.Data
                     await userManager.AddToRoleAsync(admin, AppRoles.Admin);
                 }
             }
+            else if (!await userManager.IsInRoleAsync(adminUser, AppRoles.Admin))
+            {
+                await userManager.AddToRoleAsync(adminUser, AppRoles.Admin);
+            }
 
             // 3. Seed Staff User
             var staffEmail = "staff@momoi.com";
-            if (await userManager.FindByEmailAsync(staffEmail) == null)
+            var staffUser = await userManager.FindByEmailAsync(staffEmail);
+            if (staffUser == null)
             {
                 var staff = new AppUser
                 {
@@ -63,10 +69,15 @@ namespace MomOi.API.Data
                     await userManager.AddToRoleAsync(staff, AppRoles.Staff);
                 }
             }
+            else if (!await userManager.IsInRoleAsync(staffUser, AppRoles.Staff))
+            {
+                await userManager.AddToRoleAsync(staffUser, AppRoles.Staff);
+            }
 
             // 4. Seed Expert User
             var expertEmail = "expert@momoi.com";
-            if (await userManager.FindByEmailAsync(expertEmail) == null)
+            var expertUser = await userManager.FindByEmailAsync(expertEmail);
+            if (expertUser == null)
             {
                 var expert = new AppUser
                 {
@@ -82,6 +93,10 @@ namespace MomOi.API.Data
                 {
                     await userManager.AddToRoleAsync(expert, AppRoles.Expert);
                 }
+            }
+            else if (!await userManager.IsInRoleAsync(expertUser, AppRoles.Expert))
+            {
+                await userManager.AddToRoleAsync(expertUser, AppRoles.Expert);
             }
         }
     }
