@@ -1,10 +1,12 @@
 using Microsoft.Extensions.Logging;
 using MomOi.API.DTOs;
+using MomOi.API.Models;
 using MomOi.API.Models.Health;
 using MomOi.API.Repositories;
 using MomOi.API.Services.AI;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using RecipeEntity = MomOi.API.Models.Health.Recipe;
@@ -78,6 +80,40 @@ namespace MomOi.API.Services.AIFeatures
                 if ((item.TryGetProperty("steps", out var stepEl) || item.TryGetProperty("Steps", out stepEl)) && stepEl.ValueKind == JsonValueKind.Array)
                     foreach (var s in stepEl.EnumerateArray()) steps.Add(s.GetString() ?? "");
 
+                // AI trả chỉ số dạng chuỗi ("20g", "20 phút", "Dễ") hoặc số — chuẩn hóa về
+                // kiểu của entity. Chấp nhận cả camelCase lẫn PascalCase.
+                bool TryGet(string lower, string upper, out JsonElement el) =>
+                    item.TryGetProperty(lower, out el) || item.TryGetProperty(upper, out el);
+
+                // Lấy số từ "20g" / "20 phút" / 20  -> 20
+                float Num(string lower, string upper)
+                {
+                    if (!TryGet(lower, upper, out var el)) return 0f;
+                    if (el.ValueKind == JsonValueKind.Number) return el.GetSingle();
+                    if (el.ValueKind == JsonValueKind.String)
+                    {
+                        var digits = new string((el.GetString() ?? "")
+                            .TakeWhile(c => char.IsDigit(c) || c == '.' || c == ',').ToArray())
+                            .Replace(',', '.');
+                        if (float.TryParse(digits, System.Globalization.NumberStyles.Float,
+                                System.Globalization.CultureInfo.InvariantCulture, out var f))
+                            return f;
+                    }
+                    return 0f;
+                }
+
+                var difficulty = Difficulty.Easy;
+                if (TryGet("difficulty", "Difficulty", out var diffEl) && diffEl.ValueKind == JsonValueKind.String)
+                {
+                    var d = (diffEl.GetString() ?? "").Trim().ToLowerInvariant();
+                    difficulty = d switch
+                    {
+                        "trung bình" or "medium" => Difficulty.Medium,
+                        "khó" or "hard" => Difficulty.Hard,
+                        _ => Difficulty.Easy
+                    };
+                }
+
                 await _recipeRepo.AddAsync(new RecipeEntity
                 {
                     UserId = userId,
@@ -87,6 +123,11 @@ namespace MomOi.API.Services.AIFeatures
                     IngredientsJson = JsonSerializer.Serialize(ingredients),
                     StepsJson = JsonSerializer.Serialize(steps),
                     Calories = calories,
+                    Protein = Num("protein", "Protein"),
+                    Carbs = Num("carbs", "Carbs"),
+                    Fat = Num("fat", "Fat"),
+                    PrepTimeMinutes = (int)Num("prepTime", "PrepTime"),
+                    Difficulty = difficulty,
                     Status = RecipeStatus.PendingReview,
                     GeneratedAt = DateTime.UtcNow,
                     CreatedAt = DateTime.UtcNow,

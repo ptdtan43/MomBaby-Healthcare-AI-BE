@@ -263,8 +263,10 @@ namespace MomOi.API.Services.AI
             try
             {
                 var prompt = $"Hãy gợi ý 3 món ăn/thực đơn đơn giản, bổ dưỡng cho mẹ bầu dựa trên yêu cầu: '{query}'. " +
+                             $"Ước lượng đầy đủ các chỉ số dinh dưỡng cho MỘT khẩu phần: calories (số kcal), " +
+                             $"protein/carbs/fat (số gam, ghi kèm đơn vị 'g'), prepTime (thời gian nấu) và difficulty (Dễ|Trung bình|Khó). " +
                              $"Trả về ĐÚNG MỘT khối JSON MẢNG (Array) hợp lệ theo cấu trúc sau (không bao gồm markdown ```json hay bất kỳ văn bản nào khác):\n" +
-                             $"[\n  {{\n    \"recipe\": \"Tên món ăn 1\",\n    \"calories\": 350,\n    \"ingredients\": [\"Nguyên liệu 1\"],\n    \"steps\": [\"Bước 1\"],\n    \"youtubeLink\": \"\"\n  }}\n]";
+                             $"[\n  {{\n    \"recipe\": \"Tên món ăn 1\",\n    \"calories\": 350,\n    \"protein\": \"20g\",\n    \"carbs\": \"40g\",\n    \"fat\": \"12g\",\n    \"prepTime\": \"20 phút\",\n    \"difficulty\": \"Dễ\",\n    \"ingredients\": [\"Nguyên liệu 1\"],\n    \"steps\": [\"Bước 1\"],\n    \"youtubeLink\": \"\"\n  }}\n]";
 
                 // jsonMode ép model trả JSON thuần (không code fence) để caller parse trực tiếp.
                 return await CallGeminiTextApiAsync(prompt, jsonMode: true);

@@ -62,135 +62,93 @@ namespace MomOi.API.Services.Baby
                 return ApiResponse<object>.FailureResult(
                     "Dịch vụ dinh dưỡng (Nutrition API) hiện không khả dụng. Vui lòng thử lại sau.");
 
-            // Thêm logic tự động lưu vào Database để chuyên gia có thể duyệt và ánh xạ trạng thái
-            if (menu != null)
+            // Đồng bộ menu hiện tại với bảng recipes (Category = Baby) theo TÊN MÓN:
+            //  - Món đã có bản ghi (bất kể ngày nào) => GIỮ NGUYÊN trạng thái chuyên gia đã duyệt/từ chối
+            //  - Món chưa có => tạo PendingReview để xuất hiện trong hàng chờ duyệt của chuyên gia
+            // Sau đó gắn "status" (0=chờ, 1=duyệt, 2=từ chối) vào từng meal cho FE hiển thị badge.
+            // Chạy trên MỌI lần gọi (kể cả cache-hit) để badge luôn phản ánh quyết định mới nhất.
+            try
             {
-                try
+                var existingRecipes = await _recipeRepo.FindAsync(r =>
+                    r.UserId == userId && r.Category == RecipeCategory.Baby);
+
+                // Bản ghi mới nhất cho mỗi tên món
+                var byTitle = existingRecipes
+                    .GroupBy(r => r.Title)
+                    .ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.GeneratedAt).First());
+
+                var jsonNode = System.Text.Json.JsonSerializer.SerializeToNode(menu);
+                var newRows = new List<MomOi.API.Models.Health.Recipe>();
+
+                void SyncAndTag(System.Text.Json.Nodes.JsonObject mealsNode, string dayPrefix)
                 {
-                    var today = DateTime.UtcNow.Date;
-                    var existingRecipes = await _recipeRepo.FindAsync(r => r.UserId == userId && r.Category == RecipeCategory.Baby && r.GeneratedAt >= today);
-                    
-                    var existingList = existingRecipes.ToList();
-                    
-                    // If we are force refreshing, we want to clear the old recipes and save the new ones
-                    if (isNewMenu && forceRefresh && existingList.Any())
+                    foreach (var mealProp in mealsNode)
                     {
-                        foreach (var r in existingList)
+                        if (mealProp.Value is not System.Text.Json.Nodes.JsonObject mealNode) continue;
+
+                        var mealName = mealNode["name_vi"]?.ToString()
+                                       ?? mealNode["name_en"]?.ToString()
+                                       ?? "Thực đơn bé";
+                        var title = string.IsNullOrEmpty(dayPrefix) ? mealName : $"{dayPrefix}: {mealName}";
+
+                        if (!byTitle.TryGetValue(title, out var recipeRow))
                         {
-                            _recipeRepo.Remove(r);
+                            double cal = 0;
+                            try { cal = mealNode["total_calories"]?.GetValue<double>() ?? 0; } catch { }
+
+                            recipeRow = new MomOi.API.Models.Health.Recipe
+                            {
+                                UserId = userId,
+                                ProfileStage = "post-natal",
+                                Category = RecipeCategory.Baby,
+                                Title = title,
+                                Description = $"Tạo tự động từ AI dinh dưỡng cho bé {baby.AgeMonths} tháng tuổi.",
+                                Calories = (int)cal,
+                                Status = RecipeStatus.PendingReview,
+                                GeneratedAt = DateTime.UtcNow,
+                                CreatedAt = DateTime.UtcNow,
+                                UpdatedAt = DateTime.UtcNow
+                            };
+                            newRows.Add(recipeRow);
+                            byTitle[title] = recipeRow;
                         }
-                        await _recipeRepo.SaveChangesAsync();
-                        existingList.Clear();
+
+                        mealNode["status"] = (int)recipeRow.Status;
                     }
-                    
-                    // Also clear existing if we are fetching weekly but only daily exists, or vice versa?
-                    // Actually, if we just want to ensure we save at least once, we can just save if !existingList.Any()
-                    if (isNewMenu && !existingList.Any())
-                    {
-                        var json = System.Text.Json.JsonSerializer.Serialize(menu);
-                        using var doc = System.Text.Json.JsonDocument.Parse(json);
-                        
-                        var recipesToAdd = new List<MomOi.API.Models.Health.Recipe>();
-                        
-                        void AddMeals(System.Text.Json.JsonElement meals, string dayPrefix)
-                        {
-                            foreach (var mealProp in meals.EnumerateObject())
-                            {
-                                var mealObj = mealProp.Value;
-                                var mealName = mealObj.TryGetProperty("name_vi", out var nameEl) ? nameEl.GetString() : "Thực đơn cho bé";
-                                var calories = mealObj.TryGetProperty("total_calories", out var calEl) ? calEl.GetSingle() : 0;
-                                
-                                var newRecipe = new MomOi.API.Models.Health.Recipe
-                                {
-                                    UserId = userId,
-                                    ProfileStage = "post-natal",
-                                    Category = RecipeCategory.Baby,
-                                    Title = string.IsNullOrEmpty(dayPrefix) ? (mealName ?? "Thực đơn bé") : $"{dayPrefix}: {mealName ?? "Thực đơn bé"}",
-                                    Description = $"Tạo tự động từ AI dinh dưỡng cho bé {baby.AgeMonths} tháng tuổi.",
-                                    Calories = (int)calories,
-                                    Status = RecipeStatus.PendingReview,
-                                    GeneratedAt = DateTime.UtcNow,
-                                    CreatedAt = DateTime.UtcNow,
-                                    UpdatedAt = DateTime.UtcNow
-                                };
-                                recipesToAdd.Add(newRecipe);
-                                existingList.Add(newRecipe);
-                            }
-                        }
+                }
 
-                        if (weekly)
-                        {
-                            if (doc.RootElement.TryGetProperty("days", out var days))
-                            {
-                                foreach (var day in days.EnumerateArray())
-                                {
-                                    var dayName = day.TryGetProperty("day", out var dName) ? dName.GetString() : "";
-                                    if (day.TryGetProperty("meals", out var meals))
-                                    {
-                                        AddMeals(meals, dayName);
-                                    }
-                                }
-                            }
-                        }
-                        else
-                        {
-                            if (doc.RootElement.TryGetProperty("meals", out var meals))
-                            {
-                                AddMeals(meals, "");
-                            }
-                        }
-
-                        foreach (var r in recipesToAdd)
-                        {
-                            await _recipeRepo.AddAsync(r);
-                        }
-                        await _recipeRepo.SaveChangesAsync();
-                    }
-
-                    // Map status to the menu object
-                    var jsonNode = System.Text.Json.JsonSerializer.SerializeToNode(menu);
-                    
-                    if (weekly && jsonNode?["days"] is System.Text.Json.Nodes.JsonArray daysNode)
+                if (weekly)
+                {
+                    if (jsonNode?["days"] is System.Text.Json.Nodes.JsonArray daysNode)
                     {
                         foreach (var dayNode in daysNode)
                         {
                             var dName = dayNode?["day"]?.ToString() ?? "";
-                            if (dayNode?["meals"] is System.Text.Json.Nodes.JsonObject mealsNode)
-                            {
-                                foreach (var mealProp in mealsNode)
-                                {
-                                    var mealName = mealProp.Value?["name_vi"]?.ToString();
-                                    var fullTitle = string.IsNullOrEmpty(dName) ? mealName : $"{dName}: {mealName}";
-                                    var matchingRecipe = existingList.FirstOrDefault(r => r.Title == fullTitle);
-                                    if (matchingRecipe != null && mealProp.Value is System.Text.Json.Nodes.JsonObject singleMealNode)
-                                    {
-                                        singleMealNode["status"] = (int)matchingRecipe.Status;
-                                    }
-                                }
-                            }
+                            if (dayNode?["meals"] is System.Text.Json.Nodes.JsonObject weeklyMeals)
+                                SyncAndTag(weeklyMeals, dName);
                         }
                     }
-                    else if (!weekly && jsonNode?["meals"] is System.Text.Json.Nodes.JsonObject mealsNode)
-                    {
-                        foreach (var mealProp in mealsNode)
-                        {
-                            var mealName = mealProp.Value?["name_vi"]?.ToString();
-                            var matchingRecipe = existingList.FirstOrDefault(r => r.Title == mealName);
-                            if (matchingRecipe != null && mealProp.Value is System.Text.Json.Nodes.JsonObject singleMealNode)
-                            {
-                                singleMealNode["status"] = (int)matchingRecipe.Status;
-                            }
-                        }
-                    }
-                    
-                    // Return the modified JSON and update cache
-                    menu = jsonNode;
-                    _dailyMenuCache[cacheKey] = menu;
                 }
-                catch (Exception)
+                else if (jsonNode?["meals"] is System.Text.Json.Nodes.JsonObject dailyMeals)
                 {
-                    // Lỗi lưu DB không nên chặn user xem thực đơn
+                    SyncAndTag(dailyMeals, "");
                 }
+
+                foreach (var r in newRows)
+                {
+                    await _recipeRepo.AddAsync(r);
+                }
+                if (newRows.Count > 0)
+                {
+                    await _recipeRepo.SaveChangesAsync();
+                }
+
+                menu = jsonNode!;
+                _dailyMenuCache[cacheKey] = menu;
+            }
+            catch (Exception)
+            {
+                // Lỗi đồng bộ DB không nên chặn user xem thực đơn
             }
 
             return ApiResponse<object>.SuccessResult(menu, "Lấy thực đơn cho bé thành công.");
