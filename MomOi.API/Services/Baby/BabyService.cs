@@ -43,14 +43,20 @@ namespace MomOi.API.Services.Baby
             var todayStr = DateTime.UtcNow.ToString("yyyy-MM-dd");
             string cacheKey = weekly ? $"weekly_{userId}_{babyId}_{todayStr}" : $"daily_{userId}_{babyId}_{todayStr}";
 
+            object menu = null;
+            bool isNewMenu = false;
+
             if (!forceRefresh && _dailyMenuCache.TryGetValue(cacheKey, out var cachedMenu))
             {
-                return ApiResponse<object>.SuccessResult(cachedMenu, "Lấy thực đơn cho bé thành công.");
+                menu = cachedMenu;
             }
-
-            var menu = weekly
-                ? await _nutritionProxy.GetBabyWeeklyMenuAsync(baby.AgeMonths, baby.CurrentWeightKg, baby.Allergies)
-                : await _nutritionProxy.GetBabyDailyMenuAsync(baby.AgeMonths, baby.CurrentWeightKg, baby.Allergies);
+            else
+            {
+                menu = weekly
+                    ? await _nutritionProxy.GetBabyWeeklyMenuAsync(baby.AgeMonths, baby.CurrentWeightKg, baby.Allergies)
+                    : await _nutritionProxy.GetBabyDailyMenuAsync(baby.AgeMonths, baby.CurrentWeightKg, baby.Allergies);
+                isNewMenu = true;
+            }
 
             if (menu == null)
                 return ApiResponse<object>.FailureResult(
@@ -67,7 +73,7 @@ namespace MomOi.API.Services.Baby
                     var existingList = existingRecipes.ToList();
                     
                     // If we are force refreshing, we want to clear the old recipes and save the new ones
-                    if (forceRefresh && existingList.Any())
+                    if (isNewMenu && forceRefresh && existingList.Any())
                     {
                         foreach (var r in existingList)
                         {
@@ -79,7 +85,7 @@ namespace MomOi.API.Services.Baby
                     
                     // Also clear existing if we are fetching weekly but only daily exists, or vice versa?
                     // Actually, if we just want to ensure we save at least once, we can just save if !existingList.Any()
-                    if (!existingList.Any())
+                    if (isNewMenu && !existingList.Any())
                     {
                         var json = System.Text.Json.JsonSerializer.Serialize(menu);
                         using var doc = System.Text.Json.JsonDocument.Parse(json);
