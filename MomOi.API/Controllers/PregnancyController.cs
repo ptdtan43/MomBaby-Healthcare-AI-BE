@@ -69,7 +69,7 @@ namespace MomOi.API.Controllers
         /// Logs foods consumed and evaluates pregnancy safety checks. Gated under the Modern Mom subscription tier.
         /// </summary>
         [HttpPost("food-log")]
-        [RequiresTier(SubscriptionTier.MomHienDai)]
+
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
         public async Task<IActionResult> LogFood([FromBody] FoodLogRequest request)
         {
@@ -84,7 +84,7 @@ namespace MomOi.API.Controllers
         /// Generates a customized 7-day maternal meal plan. Gated under the Modern Mom subscription tier.
         /// </summary>
         [HttpGet("meal-plan")]
-        [RequiresTier(SubscriptionTier.MomHienDai)]
+
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetMealPlan([FromQuery] int? week)
         {
@@ -119,7 +119,7 @@ namespace MomOi.API.Controllers
         /// Retrieves recommended exercise plan matching the user's trimester. Gated under the Modern Mom subscription tier.
         /// </summary>
         [HttpGet("exercise-plan")]
-        [RequiresTier(SubscriptionTier.MomHienDai)]
+
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetExercisePlan()
         {

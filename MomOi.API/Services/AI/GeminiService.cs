@@ -262,11 +262,36 @@ namespace MomOi.API.Services.AI
 
             try
             {
-                var prompt = $"Hãy gợi ý 3 món ăn/thực đơn đơn giản, bổ dưỡng cho mẹ bầu dựa trên yêu cầu: '{query}'. " +
-                             $"Ước lượng đầy đủ các chỉ số dinh dưỡng cho MỘT khẩu phần: calories (số kcal), " +
-                             $"protein/carbs/fat (số gam, ghi kèm đơn vị 'g'), prepTime (thời gian nấu) và difficulty (Dễ|Trung bình|Khó). " +
-                             $"Trả về ĐÚNG MỘT khối JSON MẢNG (Array) hợp lệ theo cấu trúc sau (không bao gồm markdown ```json hay bất kỳ văn bản nào khác):\n" +
-                             $"[\n  {{\n    \"recipe\": \"Tên món ăn 1\",\n    \"calories\": 350,\n    \"protein\": \"20g\",\n    \"carbs\": \"40g\",\n    \"fat\": \"12g\",\n    \"prepTime\": \"20 phút\",\n    \"difficulty\": \"Dễ\",\n    \"ingredients\": [\"Nguyên liệu 1\"],\n    \"steps\": [\"Bước 1\"],\n    \"youtubeLink\": \"\"\n  }}\n]";
+                var prompt = $@"Bạn là một chuyên gia dinh dưỡng cho mẹ bầu. Nhiệm vụ của bạn là kiểm tra đầu vào và gợi ý công thức nấu ăn.
+
+**BƯỚC 1: KIỂM TRA ĐẦU VÀO**
+Yêu cầu của người dùng: '{query}'
+
+Hãy kiểm tra kỹ tất cả các thành phần trong yêu cầu trên (phần Dị ứng, phần Nguyên liệu có sẵn). 
+- Nếu BẤT KỲ thành phần nào KHÔNG PHẢI là tên thực phẩm/nguyên liệu nấu ăn thật sự bằng tiếng Việt hoặc tiếng Anh (ví dụ: ký tự vô nghĩa như 'j97', 'abc', '123', 'asdfgh', hoặc bất kỳ chuỗi nào không phải tên thực phẩm), hãy trả về JSON sau và DỪNG LẠI:
+  {{""error"": true, ""message"": ""Vui lòng nhập tên thực phẩm hợp lệ (ví dụ: tôm, thịt bò, rau cải...). Hệ thống không nhận diện được: [liệt kê các thành phần không hợp lệ]""}}
+
+- Nếu phần Dị ứng ghi ""Không"" hoặc để trống thì bỏ qua kiểm tra phần đó.
+- Nếu phần Nguyên liệu có sẵn ghi ""Không"" hoặc để trống thì bỏ qua kiểm tra phần đó.
+
+**BƯỚC 2: TẠO CÔNG THỨC (chỉ thực hiện nếu đầu vào hợp lệ)**
+Gợi ý 3 món ăn đơn giản, bổ dưỡng cho mẹ bầu. Ước lượng đầy đủ các chỉ số dinh dưỡng cho MỘT khẩu phần: calories (số kcal), protein/carbs/fat (số gam, ghi kèm đơn vị 'g'), prepTime (thời gian nấu) và difficulty (Dễ|Trung bình|Khó).
+
+Trả về ĐÚNG MỘT khối JSON MẢNG (Array) hợp lệ:
+[
+  {{
+    ""recipe"": ""Tên món ăn 1"",
+    ""calories"": 350,
+    ""protein"": ""20g"",
+    ""carbs"": ""40g"",
+    ""fat"": ""12g"",
+    ""prepTime"": ""20 phút"",
+    ""difficulty"": ""Dễ"",
+    ""ingredients"": [""Nguyên liệu 1""],
+    ""steps"": [""Bước 1""],
+    ""youtubeLink"": """"
+  }}
+]";
 
                 // jsonMode ép model trả JSON thuần (không code fence) để caller parse trực tiếp.
                 return await CallGeminiTextApiAsync(prompt, jsonMode: true);

@@ -46,6 +46,19 @@ namespace MomOi.API.Services.AIFeatures
                 aiResponseJson = await _geminiService.GenerateMultiAiDietRecipesAsync(request.Query);
                 using var doc = JsonDocument.Parse(aiResponseJson);
                 recipesArray = doc.RootElement.Clone();
+                
+                // AI trả về object {"error": true, "message": "..."} khi đầu vào không hợp lệ
+                if (recipesArray.ValueKind == JsonValueKind.Object)
+                {
+                    if (recipesArray.TryGetProperty("error", out var errorProp) && errorProp.GetBoolean())
+                    {
+                        var errorMsg = recipesArray.TryGetProperty("message", out var msgProp) 
+                            ? msgProp.GetString() 
+                            : "Đầu vào không hợp lệ. Vui lòng nhập tên thực phẩm thật.";
+                        return ApiResponse<object>.FailureResult(errorMsg);
+                    }
+                    return ApiResponse<object>.FailureResult("AI trả về dữ liệu không đúng định dạng. Vui lòng thử lại.");
+                }
                 if (recipesArray.ValueKind != JsonValueKind.Array)
                 {
                     return ApiResponse<object>.FailureResult("AI trả về dữ liệu không đúng định dạng. Vui lòng thử lại.");
