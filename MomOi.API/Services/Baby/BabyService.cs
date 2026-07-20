@@ -76,7 +76,7 @@ namespace MomOi.API.Services.Baby
                     r.Title != null &&
                     (r.Title.Contains(" (FOUND DB:") || r.Title.Contains(" (NEW DB:")));
                 
-                if (corruptedRecipes != null && corruptedRecipes.Count > 0)
+                if (corruptedRecipes != null && corruptedRecipes.Any())
                 {
                     foreach (var cr in corruptedRecipes)
                     {
