@@ -60,12 +60,12 @@ namespace MomOi.API.Controllers
         /// </summary>
         [HttpGet("{id}/menu/daily")]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetDailyMenu(int id)
+        public async Task<IActionResult> GetDailyMenu(int id, [FromQuery] bool force = false)
         {
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId)) return Unauthorized();
 
-            var response = await _babyService.GetBabyMenuAsync(userId, id, weekly: false);
+            var response = await _babyService.GetBabyMenuAsync(userId, id, weekly: false, forceRefresh: force);
             return response.Success ? Ok(response) : BadRequest(response);
         }
 
@@ -74,12 +74,12 @@ namespace MomOi.API.Controllers
         /// </summary>
         [HttpGet("{id}/menu/weekly")]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetWeeklyMenu(int id)
+        public async Task<IActionResult> GetWeeklyMenu(int id, [FromQuery] bool force = false)
         {
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId)) return Unauthorized();
 
-            var response = await _babyService.GetBabyMenuAsync(userId, id, weekly: true);
+            var response = await _babyService.GetBabyMenuAsync(userId, id, weekly: true, forceRefresh: force);
             return response.Success ? Ok(response) : BadRequest(response);
         }
 

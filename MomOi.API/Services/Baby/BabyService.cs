@@ -34,21 +34,18 @@ namespace MomOi.API.Services.Baby
 
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, object> _dailyMenuCache = new();
 
-        public async Task<ApiResponse<object>> GetBabyMenuAsync(string userId, int babyId, bool weekly)
+        public async Task<ApiResponse<object>> GetBabyMenuAsync(string userId, int babyId, bool weekly, bool forceRefresh = false)
         {
             var baby = await _babyRepo.FirstOrDefaultAsync(b => b.Id == babyId && b.UserId == userId);
             if (baby == null)
                 return ApiResponse<object>.FailureResult("Không tìm thấy hồ sơ bé.");
 
-            string cacheKey = "";
-            if (!weekly)
+            var todayStr = DateTime.UtcNow.ToString("yyyy-MM-dd");
+            string cacheKey = weekly ? $"weekly_{userId}_{babyId}_{todayStr}" : $"daily_{userId}_{babyId}_{todayStr}";
+
+            if (!forceRefresh && _dailyMenuCache.TryGetValue(cacheKey, out var cachedMenu))
             {
-                var todayStr = DateTime.UtcNow.ToString("yyyy-MM-dd");
-                cacheKey = $"{userId}_{babyId}_{todayStr}";
-                if (_dailyMenuCache.TryGetValue(cacheKey, out var cachedMenu))
-                {
-                    return ApiResponse<object>.SuccessResult(cachedMenu, "Lấy thực đơn cho bé thành công.");
-                }
+                return ApiResponse<object>.SuccessResult(cachedMenu, "Lấy thực đơn cho bé thành công.");
             }
 
             var menu = weekly
@@ -69,6 +66,19 @@ namespace MomOi.API.Services.Baby
                     
                     var existingList = existingRecipes.ToList();
                     
+                    // If we are force refreshing, we want to clear the old recipes and save the new ones
+                    if (forceRefresh && existingList.Any())
+                    {
+                        foreach (var r in existingList)
+                        {
+                            _recipeRepo.Remove(r);
+                        }
+                        await _recipeRepo.SaveChangesAsync();
+                        existingList.Clear();
+                    }
+                    
+                    // Also clear existing if we are fetching weekly but only daily exists, or vice versa?
+                    // Actually, if we just want to ensure we save at least once, we can just save if !existingList.Any()
                     if (!existingList.Any())
                     {
                         var json = System.Text.Json.JsonSerializer.Serialize(menu);
@@ -299,6 +309,10 @@ namespace MomOi.API.Services.Baby
 
             _babyRepo.Update(existing);
             await _babyRepo.SaveChangesAsync();
+
+            var todayStr = DateTime.UtcNow.ToString("yyyy-MM-dd");
+            _dailyMenuCache.TryRemove($"daily_{userId}_{id}_{todayStr}", out _);
+            _dailyMenuCache.TryRemove($"weekly_{userId}_{id}_{todayStr}", out _);
 
             return ApiResponse<BabyProfile>.SuccessResult(existing, "Cập nhật hồ sơ bé thành công.");
         }
