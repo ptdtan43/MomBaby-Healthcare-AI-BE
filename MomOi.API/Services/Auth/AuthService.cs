@@ -105,6 +105,11 @@ namespace MomOi.API.Services.Auth
                 throw new UnauthorizedAccessException("Email hoặc mật khẩu không chính xác.");
             }
 
+            if (await _userManager.IsLockedOutAsync(user) || (user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTimeOffset.UtcNow))
+            {
+                throw new UnauthorizedAccessException("Tài khoản của bạn đã bị khóa bởi Quản trị viên.");
+            }
+
             var token = await GenerateJwtTokenAsync(user);
             var refreshToken = GenerateRefreshToken();
 
@@ -144,6 +149,11 @@ namespace MomOi.API.Services.Auth
             if (user == null || user.RefreshToken != dto.RefreshToken || user.RefreshTokenExpiryTime <= DateTime.UtcNow)
             {
                 throw new UnauthorizedAccessException("Refresh Token không hợp lệ hoặc đã hết hạn.");
+            }
+
+            if (await _userManager.IsLockedOutAsync(user) || (user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTimeOffset.UtcNow))
+            {
+                throw new UnauthorizedAccessException("Tài khoản của bạn đã bị khóa bởi Quản trị viên.");
             }
 
             var newToken = await GenerateJwtTokenAsync(user);

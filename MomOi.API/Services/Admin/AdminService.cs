@@ -93,6 +93,7 @@ namespace MomOi.API.Services.Admin
         {
             var user = await _userManager.FindByIdAsync(userId);
             if (user == null) return ApiResponse<object>.FailureResult("Không tìm thấy người dùng.");
+            await _userManager.SetLockoutEnabledAsync(user, true);
             await _userManager.SetLockoutEndDateAsync(user, DateTimeOffset.UtcNow.AddYears(100));
             return ApiResponse<object>.SuccessResult((object)"OK", "Khóa tài khoản thành công.");
         }
