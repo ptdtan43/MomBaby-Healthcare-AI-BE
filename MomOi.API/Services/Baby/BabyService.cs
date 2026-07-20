@@ -67,8 +67,29 @@ namespace MomOi.API.Services.Baby
             //  - Món chưa có => tạo PendingReview để xuất hiện trong hàng chờ duyệt của chuyên gia
             // Sau đó gắn "status" (0=chờ, 1=duyệt, 2=từ chối) vào từng meal cho FE hiển thị badge.
             // Chạy trên MỌI lần gọi (kể cả cache-hit) để badge luôn phản ánh quyết định mới nhất.
+            // Chạy trên MỌI lần gọi (kể cả cache-hit) để badge luôn phản ánh quyết định mới nhất.
             try
             {
+                // Tự động làm sạch các Title bị ô nhiễm do debug suffix trong DB (Self-healing)
+                var corruptedRecipes = await _recipeRepo.FindAsync(r => 
+                    r.Category == RecipeCategory.Baby && 
+                    r.Title != null &&
+                    (r.Title.Contains(" (FOUND DB:") || r.Title.Contains(" (NEW DB:")));
+                
+                if (corruptedRecipes != null && corruptedRecipes.Count > 0)
+                {
+                    foreach (var cr in corruptedRecipes)
+                    {
+                        var idx = cr.Title.IndexOf(" (FOUND DB:");
+                        if (idx == -1) idx = cr.Title.IndexOf(" (NEW DB:");
+                        if (idx != -1)
+                        {
+                            cr.Title = cr.Title.Substring(0, idx).Trim();
+                        }
+                    }
+                    await _recipeRepo.SaveChangesAsync();
+                }
+
                 var existingRecipes = await _recipeRepo.FindAsync(r =>
                     r.UserId == userId && r.Category == RecipeCategory.Baby);
 
@@ -86,10 +107,20 @@ namespace MomOi.API.Services.Baby
                     {
                         if (mealProp.Value is not System.Text.Json.Nodes.JsonObject mealNode) continue;
 
-                        var mealName = (mealNode["name_vi"]?.ToString()
+                        var rawMealName = mealNode["name_vi"]?.ToString()
                                        ?? mealNode["name_en"]?.ToString()
-                                       ?? "Thực đơn bé").Trim();
+                                       ?? "Thực đơn bé";
                         
+                        // Làm sạch mealName nếu bản thân cache cũng bị ô nhiễm bởi suffix
+                        var mealName = rawMealName.Trim();
+                        var debugIdx = mealName.IndexOf(" (FOUND DB:");
+                        if (debugIdx == -1) debugIdx = mealName.IndexOf(" (NEW DB:");
+                        if (debugIdx != -1)
+                        {
+                            mealName = mealName.Substring(0, debugIdx).Trim();
+                            mealNode["name_vi"] = mealName; // Khôi phục lại tên gốc sạch sẽ
+                        }
+
                         var title = string.IsNullOrEmpty(dayPrefix) ? mealName : $"{dayPrefix}: {mealName}";
                         var searchKey = title.Trim().ToLower();
 
@@ -103,7 +134,7 @@ namespace MomOi.API.Services.Baby
                                 UserId = userId,
                                 ProfileStage = "post-natal",
                                 Category = RecipeCategory.Baby,
-                                Title = title, // Vẫn lưu title gốc vào DB
+                                Title = title, // Vẫn lưu title gốc sạch sẽ vào DB
                                 Description = $"Tạo tự động từ AI dinh dưỡng cho bé {baby.AgeMonths} tháng tuổi.",
                                 Calories = (int)cal,
                                 Status = RecipeStatus.PendingReview,
