@@ -72,9 +72,9 @@ namespace MomOi.API.Services.Baby
                 var existingRecipes = await _recipeRepo.FindAsync(r =>
                     r.UserId == userId && r.Category == RecipeCategory.Baby);
 
-                // Bản ghi mới nhất cho mỗi tên món
+                // Bản ghi mới nhất cho mỗi tên món (chuẩn hóa chữ thường, xóa khoảng trắng)
                 var byTitle = existingRecipes
-                    .GroupBy(r => r.Title)
+                    .GroupBy(r => (r.Title ?? "").Trim().ToLower())
                     .ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.GeneratedAt).First());
 
                 var jsonNode = System.Text.Json.JsonSerializer.SerializeToNode(menu);
@@ -86,12 +86,14 @@ namespace MomOi.API.Services.Baby
                     {
                         if (mealProp.Value is not System.Text.Json.Nodes.JsonObject mealNode) continue;
 
-                        var mealName = mealNode["name_vi"]?.ToString()
+                        var mealName = (mealNode["name_vi"]?.ToString()
                                        ?? mealNode["name_en"]?.ToString()
-                                       ?? "Thực đơn bé";
+                                       ?? "Thực đơn bé").Trim();
+                        
                         var title = string.IsNullOrEmpty(dayPrefix) ? mealName : $"{dayPrefix}: {mealName}";
+                        var searchKey = title.Trim().ToLower();
 
-                        if (!byTitle.TryGetValue(title, out var recipeRow))
+                        if (!byTitle.TryGetValue(searchKey, out var recipeRow))
                         {
                             double cal = 0;
                             try { cal = mealNode["total_calories"]?.GetValue<double>() ?? 0; } catch { }
@@ -101,7 +103,7 @@ namespace MomOi.API.Services.Baby
                                 UserId = userId,
                                 ProfileStage = "post-natal",
                                 Category = RecipeCategory.Baby,
-                                Title = title,
+                                Title = title, // Vẫn lưu title gốc vào DB
                                 Description = $"Tạo tự động từ AI dinh dưỡng cho bé {baby.AgeMonths} tháng tuổi.",
                                 Calories = (int)cal,
                                 Status = RecipeStatus.PendingReview,
@@ -110,7 +112,7 @@ namespace MomOi.API.Services.Baby
                                 UpdatedAt = DateTime.UtcNow
                             };
                             newRows.Add(recipeRow);
-                            byTitle[title] = recipeRow;
+                            byTitle[searchKey] = recipeRow;
                         }
 
                         mealNode["status"] = (int)recipeRow.Status;
