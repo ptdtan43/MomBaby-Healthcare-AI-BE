@@ -40,6 +40,13 @@ namespace MomOi.API.Services.Baby
             if (baby == null)
                 return ApiResponse<object>.FailureResult("Không tìm thấy hồ sơ bé.");
 
+            // Theo khuyến nghị WHO/CDC/Viện Dinh dưỡng Quốc gia: bé dưới 6 tháng tuổi cần
+            // bú mẹ hoàn toàn, chưa đến giai đoạn ăn dặm nên không sinh thực đơn ăn dặm.
+            if (baby.AgeMonths < 6)
+                return ApiResponse<object>.FailureResult(
+                    $"Bé {baby.AgeMonths} tháng tuổi cần bú mẹ/sữa công thức hoàn toàn, chưa đến giai đoạn ăn dặm (khuyến nghị bắt đầu từ 6 tháng tuổi).",
+                    errorCode: "BABY_TOO_YOUNG_FOR_WEANING");
+
             var todayStr = DateTime.UtcNow.ToString("yyyy-MM-dd");
             string cacheKey = weekly ? $"weekly_{userId}_{babyId}_{todayStr}" : $"daily_{userId}_{babyId}_{todayStr}";
 

@@ -1,6 +1,7 @@
 using MomOi.API.Models.Identity;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
 namespace MomOi.API.Models.Health
 {
@@ -48,11 +49,13 @@ namespace MomOi.API.Models.Health
         /// <summary>
         /// Height of the mother in cm.
         /// </summary>
+        [Range(50, 250, ErrorMessage = "Chiều cao phải trong khoảng 50-250 cm.")]
         public float? Height { get; set; }
 
         /// <summary>
         /// Weight of the mother in kg.
         /// </summary>
+        [Range(20, 300, ErrorMessage = "Cân nặng phải trong khoảng 20-300 kg.")]
         public float? Weight { get; set; }
 
         /// <summary>

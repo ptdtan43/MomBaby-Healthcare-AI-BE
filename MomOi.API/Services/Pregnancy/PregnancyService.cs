@@ -167,7 +167,11 @@ namespace MomOi.API.Services.Pregnancy
             };
             await _pregLogRepo.AddAsync(pregnancyLog);
 
-            profile.Bmi = weightKg / 2.5f;
+            if (profile.Height.HasValue && profile.Height.Value > 0)
+            {
+                var heightM = profile.Height.Value / 100f;
+                profile.Bmi = weightKg / (heightM * heightM);
+            }
             profile.UpdatedAt = DateTime.UtcNow;
             _profileRepo.Update(profile);
 
