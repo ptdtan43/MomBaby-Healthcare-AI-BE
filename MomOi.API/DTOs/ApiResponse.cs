@@ -27,6 +27,12 @@ namespace MomOi.API.DTOs
         public string[]? Errors { get; set; }
 
         /// <summary>
+        /// Optional machine-readable code identifying a specific failure case, so clients
+        /// can branch UI logic without matching on the (localized) Message text.
+        /// </summary>
+        public string? ErrorCode { get; set; }
+
+        /// <summary>
         /// Timestamp of the response.
         /// </summary>
         public DateTime Timestamp { get; set; } = DateTime.UtcNow;
@@ -42,9 +48,9 @@ namespace MomOi.API.DTOs
         /// <summary>
         /// Creates a failure response.
         /// </summary>
-        public static ApiResponse<T> FailureResult(string message, string[]? errors = null)
+        public static ApiResponse<T> FailureResult(string message, string[]? errors = null, string? errorCode = null)
         {
-            return new ApiResponse<T> { Success = false, Message = message, Data = default, Errors = errors, Timestamp = DateTime.UtcNow };
+            return new ApiResponse<T> { Success = false, Message = message, Data = default, Errors = errors, ErrorCode = errorCode, Timestamp = DateTime.UtcNow };
         }
     }
 }

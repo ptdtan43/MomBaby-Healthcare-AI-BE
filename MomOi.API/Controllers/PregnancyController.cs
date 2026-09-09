@@ -6,6 +6,7 @@ using MomOi.API.Middleware;
 using MomOi.API.Models.Identity;
 using MomOi.API.Services.Pregnancy;
 using System;
+using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using System.Threading.Tasks;
 
@@ -97,6 +98,7 @@ namespace MomOi.API.Controllers
 
         public class WeightLogRequest
         {
+            [Range(20, 300, ErrorMessage = "Cân nặng phải trong khoảng 20-300 kg.")]
             public float WeightKg { get; set; }
             public DateTime Date { get; set; }
         }
