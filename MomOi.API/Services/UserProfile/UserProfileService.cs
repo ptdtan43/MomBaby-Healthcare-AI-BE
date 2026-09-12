@@ -1,8 +1,5 @@
-using Microsoft.AspNetCore.Identity;
 using MomOi.API.DTOs;
-using MomOi.API.DTOs.Auth;
 using MomOi.API.Models.Health;
-using MomOi.API.Models.Identity;
 using MomOi.API.Repositories;
 using System;
 using System.Threading.Tasks;
@@ -11,14 +8,11 @@ namespace MomOi.API.Services.UserProfile
 {
     public class UserProfileService : IUserProfileService
     {
-        // UserManager là đặc thù của ASP.NET Identity, không thể thay bằng Repository
-        private readonly UserManager<AppUser> _userManager;
         private readonly IUnitOfWork _unitOfWork;
 
-        public UserProfileService(IUnitOfWork unitOfWork, UserManager<AppUser> userManager)
+        public UserProfileService(IUnitOfWork unitOfWork)
         {
             _unitOfWork = unitOfWork;
-            _userManager = userManager;
         }
 
         public async Task<ApiResponse<object>> GetProfileAsync(string userId)
@@ -72,25 +66,6 @@ namespace MomOi.API.Services.UserProfile
             await _unitOfWork.SaveChangesAsync();
 
             return ApiResponse<object>.SuccessResult(profile, "Cập nhật hồ sơ sức khỏe thành công.");
-        }
-
-        public async Task<ApiResponse<object>> UpgradeSubscriptionAsync(string userId, SubscriptionTier tier)
-        {
-            var user = await _userManager.FindByIdAsync(userId);
-            if (user == null) return ApiResponse<object>.FailureResult("Người dùng không tồn tại.");
-
-            user.Tier = tier;
-            user.TierExpiresAt = DateTime.UtcNow.AddMonths(1);
-            await _userManager.UpdateAsync(user);
-
-            var response = new UserResponseDto
-            {
-                Id = user.Id,
-                Email = user.Email!,
-                Tier = user.Tier
-            };
-
-            return ApiResponse<object>.SuccessResult(response, $"Nâng cấp thành công lên gói {tier}.");
         }
     }
 }

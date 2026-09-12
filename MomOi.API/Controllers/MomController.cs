@@ -83,16 +83,5 @@ namespace MomOi.API.Controllers
             var response = await _momService.GenerateAIDietPlanAsync(userId, dto);
             return response.Success ? Ok(response) : BadRequest(response);
         }
-
-        // ─── Premium Upgrade ────────────────────────────────────────────────────
-
-        [HttpPost("upgrade")]
-        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> UpgradeToPremium([FromBody] UpgradePremiumDto dto)
-        {
-            var userId = GetUserId();
-            var response = await _momService.UpgradeToPremiumAsync(userId, dto);
-            return response.Success ? Ok(response) : BadRequest(response);
-        }
     }
 }

@@ -10,6 +10,7 @@ services:
     environment:
       - ConnectionStrings__DefaultConnection=Host=pgdb;Port=5432;Database=momoidb;Username=postgres;Password=${POSTGRES_PASSWORD};
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - UsdaApiKey=${USDA_API_KEY}
       - NutritionApiUrl=http://nutrition-api:8001
       - RunMigrationsOnStartup=true
       - EnableSwagger=true

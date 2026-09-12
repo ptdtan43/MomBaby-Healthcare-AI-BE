@@ -1,9 +1,7 @@
-using Microsoft.AspNetCore.Identity;
 using MomOi.API.DTOs;
 using MomOi.API.DTOs.Mom;
 using MomOi.API.Models;
 using MomOi.API.Models.Health;
-using MomOi.API.Models.Identity;
 using MomOi.API.Models.Nutrition;
 using MomOi.API.Repositories;
 using MomOi.API.Services.AI;
@@ -17,17 +15,13 @@ namespace MomOi.API.Services.Mom
     public class MomService : IMomService
     {
         private readonly IUnitOfWork _unitOfWork;
-        // UserManager là đặc thù của ASP.NET Identity, không thể thay bằng Repository
-        private readonly UserManager<AppUser> _userManager;
         private readonly IGeminiService _geminiService;
 
         public MomService(
             IUnitOfWork unitOfWork,
-            UserManager<AppUser> userManager,
             IGeminiService geminiService)
         {
             _unitOfWork = unitOfWork;
-            _userManager = userManager;
             _geminiService = geminiService;
         }
 
@@ -184,37 +178,6 @@ YÊU CẦU ĐẦU RA (Chỉ trả về chuỗi JSON Array nguyên bản, KHÔNG 
             await _unitOfWork.SaveChangesAsync();
 
             return ApiResponse<object>.SuccessResult((object)plan.Id, "Đã tạo thực đơn bằng AI thành công.");
-        }
-
-        // ─── Premium Upgrade ────────────────────────────────────────────────────
-
-        public async Task<ApiResponse<object>> UpgradeToPremiumAsync(string userId, UpgradePremiumDto dto)
-        {
-            var user = await _userManager.FindByIdAsync(userId);
-            if (user == null)
-            {
-                return ApiResponse<object>.FailureResult("Không tìm thấy người dùng.");
-            }
-
-            if (string.IsNullOrWhiteSpace(dto.TransactionId))
-            {
-                return ApiResponse<object>.FailureResult("Thiếu mã giao dịch thanh toán.");
-            }
-
-            user.Tier = SubscriptionTier.SuperMomVip;
-            user.TierExpiresAt = DateTime.UtcNow.AddMonths(dto.MonthsToUpgrade);
-
-            var result = await _userManager.UpdateAsync(user);
-            if (!result.Succeeded)
-            {
-                return ApiResponse<object>.FailureResult("Lỗi khi cập nhật tài khoản.");
-            }
-
-            return ApiResponse<object>.SuccessResult((object)new
-            {
-                user.Tier,
-                user.TierExpiresAt
-            }, "Nâng cấp lên SuperMom VIP thành công.");
         }
     }
 }

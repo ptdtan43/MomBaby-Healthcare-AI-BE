@@ -52,19 +52,5 @@ namespace MomOi.API.Controllers
             var response = await _userProfileService.UpdateProfileAsync(userId, updateDto);
             return response.Success ? Ok(response) : NotFound(response);
         }
-
-        /// <summary>
-        /// Simulated endpoint to upgrade a user's subscription tier.
-        /// </summary>
-        [HttpPost("upgrade")]
-        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> UpgradeSubscription([FromQuery] SubscriptionTier tier)
-        {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId)) return Unauthorized();
-
-            var response = await _userProfileService.UpgradeSubscriptionAsync(userId, tier);
-            return response.Success ? Ok(response) : NotFound(response);
-        }
     }
 }
