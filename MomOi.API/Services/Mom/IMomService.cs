@@ -15,8 +15,5 @@ namespace MomOi.API.Services.Mom
         Task<ApiResponse<object>> GetDietPlansAsync(string userId);
         Task<ApiResponse<object>> CreateManualDietPlanAsync(string userId, CreateDietPlanDto dto);
         Task<ApiResponse<object>> GenerateAIDietPlanAsync(string userId, GenerateDietPlanDto dto);
-
-        // ─── Premium Upgrade ────────────────────────────────────────────────────
-        Task<ApiResponse<object>> UpgradeToPremiumAsync(string userId, UpgradePremiumDto dto);
     }
 }

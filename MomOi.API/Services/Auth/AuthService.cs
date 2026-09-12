@@ -91,7 +91,7 @@ namespace MomOi.API.Services.Auth
                 {
                     Id = user.Id,
                     Email = user.Email!,
-                    Tier = user.Tier,
+                    Tier = user.EffectiveTier,
                     Roles = roles
                 }
             };
@@ -126,7 +126,7 @@ namespace MomOi.API.Services.Auth
                 {
                     Id = user.Id,
                     Email = user.Email!,
-                    Tier = user.Tier,
+                    Tier = user.EffectiveTier,
                     Roles = roles
                 }
             };
@@ -172,7 +172,7 @@ namespace MomOi.API.Services.Auth
                 {
                     Id = user.Id,
                     Email = user.Email!,
-                    Tier = user.Tier,
+                    Tier = user.EffectiveTier,
                     Roles = roles
                 }
             };
@@ -197,7 +197,7 @@ namespace MomOi.API.Services.Auth
                 new Claim(ClaimTypes.Name, user.UserName ?? string.Empty),
                 new Claim(ClaimTypes.Email, user.Email ?? string.Empty),
                 new Claim("fullname", user.FullName),
-                new Claim("tier", ((int)user.Tier).ToString())
+                new Claim("tier", ((int)user.EffectiveTier).ToString())
             };
 
             var roles = await _userManager.GetRolesAsync(user);
