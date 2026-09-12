@@ -11,6 +11,7 @@ using MomOi.API.BackgroundServices;
 using MomOi.API.Data;
 using MomOi.API.DTOs;
 using MomOi.API.Models.Identity;
+using MomOi.API.Options;
 using MomOi.API.Repositories;
 using MomOi.API.Services.AI;
 using MomOi.API.Services.Admin;
@@ -30,6 +31,7 @@ using MomOi.API.Services.Medication;
 using MomOi.API.Services.Mom;
 using MomOi.API.Services.Notifications;
 using MomOi.API.Services.Nutrition;
+using MomOi.API.Services.Payment;
 using MomOi.API.Services.Postpartum;
 using MomOi.API.Services.Pregnancy;
 using MomOi.API.Services.Recipe;
@@ -154,6 +156,17 @@ namespace MomOi.API.Extensions
             services.AddScoped<IAuthService, AuthService>();
             services.AddScoped<IMomService, MomService>();
             services.AddScoped<IBusinessRuleEngine, BusinessRuleEngine>();
+
+            // Thanh toán. BindConfiguration tự lấy IConfiguration từ DI nên không cần truyền vào.
+            services.AddOptions<VnPayOptions>().BindConfiguration(VnPayOptions.SectionName);
+            services.AddOptions<MoMoOptions>().BindConfiguration(MoMoOptions.SectionName);
+            services.AddScoped<VnPayGateway>();
+            services.AddHttpClient<MoMoGateway>();
+            // Đăng ký lại dưới dạng IPaymentGateway để PaymentService chọn cổng theo tên,
+            // trỏ về đúng thực thể đã tạo ở trên thay vì dựng thêm bản sao.
+            services.AddScoped<IPaymentGateway>(sp => sp.GetRequiredService<VnPayGateway>());
+            services.AddScoped<IPaymentGateway>(sp => sp.GetRequiredService<MoMoGateway>());
+            services.AddScoped<IPaymentService, PaymentService>();
 
             // External API clients
             services.AddHttpClient<IUsdaClientService, UsdaClientService>();
