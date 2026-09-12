@@ -46,10 +46,12 @@ namespace MomOi.API.Controllers
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status201Created)]
         public async Task<IActionResult> CreateAlertManual([FromBody] CreateAlertRequestDto request)
         {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+            var currentUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(currentUserId)) return Unauthorized();
 
-            var response = await _alertService.CreateAlertManualAsync(userId, request);
+            var recipientUserId = !string.IsNullOrWhiteSpace(request.TargetUserId) ? request.TargetUserId : currentUserId;
+
+            var response = await _alertService.CreateAlertManualAsync(recipientUserId, request);
             return response.Success ? StatusCode(StatusCodes.Status201Created, response) : BadRequest(response);
         }
 
@@ -78,6 +80,18 @@ namespace MomOi.API.Controllers
             if (string.IsNullOrEmpty(userId)) return Unauthorized();
 
             var response = await _alertService.DeleteAlertAsync(userId, id);
+            return response.Success ? Ok(response) : NotFound(response);
+        }
+
+        /// <summary>
+        /// Marks alert or user risk logs as resolved.
+        /// </summary>
+        [HttpPatch("{id}/resolve")]
+        [HttpPost("{id}/resolve")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> ResolveAlert(string id)
+        {
+            var response = await _alertService.ResolveAlertAsync(id);
             return response.Success ? Ok(response) : NotFound(response);
         }
     }
