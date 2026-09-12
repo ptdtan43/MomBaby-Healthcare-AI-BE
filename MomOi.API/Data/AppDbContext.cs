@@ -155,6 +155,9 @@ namespace MomOi.API.Data
             builder.Entity<Recipe>().HasIndex(r => r.UserId);
             builder.Entity<DietPlan>().HasIndex(d => d.UserId);
             builder.Entity<PaymentTransaction>().HasIndex(p => p.UserId);
+            // Mã đơn phải duy nhất: cổng thanh toán dùng nó làm khoá đối chiếu, và IPN
+            // tra cứu theo mã này nên trùng mã là ghi nhận nhầm giao dịch.
+            builder.Entity<PaymentTransaction>().HasIndex(p => p.OrderCode).IsUnique();
             builder.Entity<VaccinationRecord>().HasIndex(v => v.BabyProfileId);
 
             builder.Entity<Recipe>().HasIndex(r => r.Status);
