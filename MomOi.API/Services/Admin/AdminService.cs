@@ -210,16 +210,13 @@ namespace MomOi.API.Services.Admin
                 .Where(u => userIds.Contains(u.Id))
                 .ToDictionaryAsync(u => u.Id, u => new { u.FullName, u.Email });
 
-            var resultList = new System.Collections.Generic.List<object>();
-
-            foreach (var group in userGroups)
+            var resultList = userGroups.Select(group =>
             {
                 var userId = group.Key;
                 usersMap.TryGetValue(userId, out var userInfo);
 
                 var latestAlert = group.OrderByDescending(a => a.TriggeredAt).First();
 
-                // Aggregate distinct alert titles/reasons for this user
                 var distinctReasons = group
                     .Select(a => string.IsNullOrEmpty(a.Title) ? a.Message : a.Title)
                     .Distinct()
@@ -227,12 +224,11 @@ namespace MomOi.API.Services.Admin
 
                 string consolidatedReason = string.Join(" • ", distinctReasons);
 
-                // Determine highest severity
-                var highestSeverity = group.Any(g => g.Severity == AlertSeverity.Critical) 
-                    ? AlertSeverity.Critical 
+                var highestSeverity = group.Any(g => g.Severity == AlertSeverity.Critical)
+                    ? AlertSeverity.Critical
                     : (group.Any(g => g.Severity == AlertSeverity.High) ? AlertSeverity.High : AlertSeverity.Warning);
 
-                resultList.Add(new
+                return new
                 {
                     id = userId,
                     userId = userId,
@@ -240,12 +236,15 @@ namespace MomOi.API.Services.Admin
                     email = userInfo?.Email ?? "N/A",
                     alertReason = consolidatedReason,
                     severity = highestSeverity.ToString().ToUpper(),
-                    updatedAt = latestAlert.TriggeredAt.ToString("yyyy-MM-dd HH:mm")
-                });
-            }
+                    updatedAt = latestAlert.TriggeredAt.ToString("yyyy-MM-dd HH:mm"),
+                    triggeredAt = latestAlert.TriggeredAt
+                };
+            })
+            .OrderByDescending(x => x.triggeredAt)
+            .ToList();
 
             return ApiResponse<object>.SuccessResult(
-                resultList.OrderByDescending(x => ((dynamic)x).updatedAt), 
+                resultList, 
                 "Lấy danh sách người dùng có nguy cơ cao thành công."
             );
         }
