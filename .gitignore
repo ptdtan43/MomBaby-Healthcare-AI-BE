@@ -5,6 +5,7 @@
 [Oo]bj/
 [Oo]ut/
 .vs/
+.idea/
 *.user
 *.userosscache
 *.suo
