@@ -160,8 +160,10 @@ namespace MomOi.API.Extensions
             // Thanh toán. BindConfiguration tự lấy IConfiguration từ DI nên không cần truyền vào.
             services.AddOptions<VnPayOptions>().BindConfiguration(VnPayOptions.SectionName);
             services.AddOptions<MoMoOptions>().BindConfiguration(MoMoOptions.SectionName);
+            services.AddOptions<BankTransferOptions>().BindConfiguration(BankTransferOptions.SectionName);
             services.AddScoped<VnPayGateway>();
             services.AddHttpClient<MoMoGateway>();
+            services.AddHttpClient<SePayBankTransferVerifier>();
             // Đăng ký lại dưới dạng IPaymentGateway để PaymentService chọn cổng theo tên,
             // trỏ về đúng thực thể đã tạo ở trên thay vì dựng thêm bản sao.
             services.AddScoped<IPaymentGateway>(sp => sp.GetRequiredService<VnPayGateway>());

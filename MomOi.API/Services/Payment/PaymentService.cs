@@ -1,16 +1,19 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using MomOi.API.Constants;
 using MomOi.API.DTOs;
 using MomOi.API.DTOs.Payment;
 using MomOi.API.Models.Identity;
+using MomOi.API.Options;
 using MomOi.API.Repositories;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace MomOi.API.Services.Payment
@@ -22,6 +25,8 @@ namespace MomOi.API.Services.Payment
         private readonly IEnumerable<IPaymentGateway> _gateways;
         private readonly VnPayGateway _vnPay;
         private readonly MoMoGateway _moMo;
+        private readonly BankTransferOptions _bankTransferOptions;
+        private readonly SePayBankTransferVerifier _sePayVerifier;
         private readonly ILogger<PaymentService> _logger;
 
         public PaymentService(
@@ -30,6 +35,8 @@ namespace MomOi.API.Services.Payment
             IEnumerable<IPaymentGateway> gateways,
             VnPayGateway vnPay,
             MoMoGateway moMo,
+            IOptions<BankTransferOptions> bankTransferOptions,
+            SePayBankTransferVerifier sePayVerifier,
             ILogger<PaymentService> logger)
         {
             _unitOfWork = unitOfWork;
@@ -37,6 +44,8 @@ namespace MomOi.API.Services.Payment
             _gateways = gateways;
             _vnPay = vnPay;
             _moMo = moMo;
+            _bankTransferOptions = bankTransferOptions.Value;
+            _sePayVerifier = sePayVerifier;
             _logger = logger;
         }
 
@@ -52,76 +61,89 @@ namespace MomOi.API.Services.Payment
                 })
                 .ToList();
 
-        // ─── Tạo giao dịch ──────────────────────────────────────────────────────
-
         public async Task<ApiResponse<CreatePaymentResponseDto>> CreatePaymentAsync(
             string userId, CreatePaymentRequestDto dto, string clientIp)
         {
             var plan = SubscriptionPlans.Get(dto.PlanCode);
             if (plan == null)
                 return ApiResponse<CreatePaymentResponseDto>.FailureResult(
-                    "Gói thuê bao không tồn tại.", errorCode: "PLAN_NOT_FOUND");
+                    "Goi thue bao khong ton tai.", errorCode: "PLAN_NOT_FOUND");
 
-            var gateway = _gateways.FirstOrDefault(g =>
-                string.Equals(g.Provider, dto.Provider, StringComparison.OrdinalIgnoreCase));
-            if (gateway == null)
+            var isBankTransfer = string.Equals(dto.Provider, "BankTransfer", StringComparison.OrdinalIgnoreCase);
+            var gateway = isBankTransfer
+                ? null
+                : _gateways.FirstOrDefault(g =>
+                    string.Equals(g.Provider, dto.Provider, StringComparison.OrdinalIgnoreCase));
+
+            if (!isBankTransfer && gateway == null)
                 return ApiResponse<CreatePaymentResponseDto>.FailureResult(
-                    $"Không hỗ trợ cổng thanh toán '{dto.Provider}'.", errorCode: "PROVIDER_UNSUPPORTED");
+                    $"Khong ho tro cong thanh toan '{dto.Provider}'.", errorCode: "PROVIDER_UNSUPPORTED");
 
             var user = await _userManager.FindByIdAsync(userId);
             if (user == null)
-                return ApiResponse<CreatePaymentResponseDto>.FailureResult("Không tìm thấy người dùng.");
+                return ApiResponse<CreatePaymentResponseDto>.FailureResult("Khong tim thay nguoi dung.");
 
             var txn = new PaymentTransaction
             {
                 UserId = userId,
-                OrderCode = GenerateOrderCode(),
+                OrderCode = await GenerateUniqueOrderCodeAsync(),
                 PlanCode = plan.Code,
                 TargetTier = plan.Tier,
                 DurationMonths = plan.Months,
                 Amount = plan.Price,
                 Currency = "VND",
-                PaymentMethod = gateway.Provider,
+                PaymentMethod = isBankTransfer ? "BankTransfer" : gateway!.Provider,
                 Status = PaymentStatus.Pending
             };
 
+            var transferMemo = BuildTransferMemo(txn.OrderCode);
             string payUrl;
-            try
+            if (isBankTransfer)
             {
-                payUrl = await gateway.CreatePaymentUrlAsync(txn, clientIp);
+                payUrl = BuildVietQrUrl(txn.Amount, transferMemo);
             }
-            catch (Exception ex)
+            else
             {
-                _logger.LogError(ex, "Không tạo được liên kết thanh toán {Provider} cho gói {PlanCode}.",
-                    gateway.Provider, plan.Code);
-                return ApiResponse<CreatePaymentResponseDto>.FailureResult(
-                    "Không kết nối được cổng thanh toán. Vui lòng thử lại.",
-                    errorCode: "GATEWAY_ERROR");
+                try
+                {
+                    payUrl = await gateway!.CreatePaymentUrlAsync(txn, clientIp);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Cannot create payment URL for {Provider}, plan {PlanCode}.",
+                        gateway!.Provider, plan.Code);
+                    return ApiResponse<CreatePaymentResponseDto>.FailureResult(
+                        "Khong ket noi duoc cong thanh toan. Vui long thu lai.",
+                        errorCode: "GATEWAY_ERROR");
+                }
             }
 
             await _unitOfWork.Repository<PaymentTransaction>().AddAsync(txn);
             await _unitOfWork.SaveChangesAsync();
 
-            _logger.LogInformation("Tạo giao dịch {OrderCode} qua {Provider} cho user {UserId}, gói {PlanCode}, {Amount} VND.",
-                txn.OrderCode, gateway.Provider, userId, plan.Code, plan.Price);
+            _logger.LogInformation("Created payment {OrderCode} via {Provider} for user {UserId}, plan {PlanCode}, {Amount} VND.",
+                txn.OrderCode, txn.PaymentMethod, userId, plan.Code, plan.Price);
 
             return ApiResponse<CreatePaymentResponseDto>.SuccessResult(new CreatePaymentResponseDto
             {
                 OrderCode = txn.OrderCode,
                 PayUrl = payUrl,
+                QrUrl = isBankTransfer ? payUrl : string.Empty,
                 Amount = plan.Price,
                 PlanName = plan.Name,
-                Provider = gateway.Provider
-            }, "Đã tạo liên kết thanh toán.");
+                PlanCode = plan.Code,
+                Provider = txn.PaymentMethod,
+                TransferMemo = isBankTransfer ? transferMemo : string.Empty,
+                BankInfo = isBankTransfer ? BuildBankInfo() : null,
+                CreatedAt = txn.CreatedAt
+            }, "Da tao lien ket thanh toan.");
         }
-
-        // ─── IPN VNPay ──────────────────────────────────────────────────────────
 
         public async Task<IpnResult> HandleVnPayIpnAsync(IQueryCollection query)
         {
             if (!_vnPay.VerifyCallback(query))
             {
-                _logger.LogWarning("IPN VNPay bị từ chối: chữ ký không hợp lệ. TxnRef={TxnRef}",
+                _logger.LogWarning("Rejected VNPay IPN: invalid signature. TxnRef={TxnRef}",
                     query["vnp_TxnRef"].ToString());
                 return new IpnResult("97", "Invalid signature");
             }
@@ -135,7 +157,6 @@ namespace MomOi.API.Services.Payment
 
             return await ConfirmAsync(
                 orderCode: query["vnp_TxnRef"].ToString(),
-                // VNPay gửi số tiền đã nhân 100.
                 amountVnd: rawAmount / 100m,
                 succeeded: succeeded,
                 failureReason: succeeded ? null
@@ -144,27 +165,22 @@ namespace MomOi.API.Services.Payment
                 rawPayload: JsonSerializer.Serialize(query.ToDictionary(kv => kv.Key, kv => kv.Value.ToString())));
         }
 
-        // ─── IPN MoMo ───────────────────────────────────────────────────────────
-
         public async Task<IpnResult> HandleMoMoIpnAsync(MoMoIpnDto dto)
         {
             if (!_moMo.VerifyIpn(dto))
             {
-                _logger.LogWarning("IPN MoMo bị từ chối: chữ ký không hợp lệ. orderId={OrderId}", dto.OrderId);
+                _logger.LogWarning("Rejected MoMo IPN: invalid signature. orderId={OrderId}", dto.OrderId);
                 return new IpnResult("97", "Invalid signature");
             }
 
             return await ConfirmAsync(
                 orderCode: dto.OrderId,
-                // MoMo gửi nguyên giá, không nhân 100.
                 amountVnd: dto.Amount,
                 succeeded: dto.ResultCode == 0,
                 failureReason: dto.ResultCode == 0 ? null : $"resultCode={dto.ResultCode}, message={dto.Message}",
                 providerTxnNo: dto.TransId.ToString(CultureInfo.InvariantCulture),
                 rawPayload: JsonSerializer.Serialize(dto));
         }
-
-        // ─── Phần xác nhận dùng chung cho mọi cổng ──────────────────────────────
 
         private async Task<IpnResult> ConfirmAsync(
             string orderCode,
@@ -179,19 +195,17 @@ namespace MomOi.API.Services.Payment
 
             if (txn == null)
             {
-                _logger.LogWarning("IPN cho đơn không tồn tại: {OrderCode}", orderCode);
+                _logger.LogWarning("Payment order not found: {OrderCode}", orderCode);
                 return new IpnResult("01", "Order not found");
             }
 
-            // Số tiền cổng báo phải khớp đơn đã lưu, nếu không là có người can thiệp.
             if (amountVnd != txn.Amount)
             {
-                _logger.LogWarning("IPN sai số tiền cho {OrderCode}: cổng báo {Gateway}, đơn lưu {Stored}.",
+                _logger.LogWarning("Invalid amount for {OrderCode}: gateway {Gateway}, stored {Stored}.",
                     orderCode, amountVnd, txn.Amount);
                 return new IpnResult("04", "Invalid amount");
             }
 
-            // Chống trùng: cổng gọi lại nhiều lần cho tới khi nhận được mã xác nhận hợp lệ.
             if (txn.Status != PaymentStatus.Pending)
                 return new IpnResult("02", "Order already confirmed");
 
@@ -207,7 +221,7 @@ namespace MomOi.API.Services.Payment
                 repo.Update(txn);
                 await _unitOfWork.SaveChangesAsync();
 
-                _logger.LogInformation("Giao dịch {OrderCode} thất bại: {Reason}", orderCode, failureReason);
+                _logger.LogInformation("Payment {OrderCode} failed: {Reason}", orderCode, failureReason);
                 return new IpnResult("00", "Confirm Success");
             }
 
@@ -215,13 +229,12 @@ namespace MomOi.API.Services.Payment
             if (user == null)
             {
                 txn.Status = PaymentStatus.Failed;
-                txn.FailureReason = "Không tìm thấy người dùng của giao dịch.";
+                txn.FailureReason = "Payment user not found.";
                 repo.Update(txn);
                 await _unitOfWork.SaveChangesAsync();
                 return new IpnResult("01", "Order not found");
             }
 
-            // Gia hạn cộng dồn: còn hạn thì nối tiếp, hết hạn thì tính từ hôm nay.
             var startFrom = user.TierExpiresAt is { } expiry && expiry > DateTime.UtcNow
                 ? expiry
                 : DateTime.UtcNow;
@@ -232,9 +245,8 @@ namespace MomOi.API.Services.Payment
             var updateResult = await _userManager.UpdateAsync(user);
             if (!updateResult.Succeeded)
             {
-                _logger.LogError("Không cập nhật được tier cho user {UserId}: {Errors}",
+                _logger.LogError("Cannot update tier for user {UserId}: {Errors}",
                     user.Id, string.Join("; ", updateResult.Errors.Select(e => e.Description)));
-                // Giao dịch vẫn Pending nên lần gọi lại sau xử lý tiếp được.
                 return new IpnResult("99", "Failed to update account");
             }
 
@@ -243,21 +255,49 @@ namespace MomOi.API.Services.Payment
             repo.Update(txn);
             await _unitOfWork.SaveChangesAsync();
 
-            _logger.LogInformation("Giao dịch {OrderCode} thành công. User {UserId} lên {Tier} đến {Expiry}.",
+            _logger.LogInformation("Payment {OrderCode} completed. User {UserId} tier {Tier} until {Expiry}.",
                 orderCode, user.Id, user.Tier, user.TierExpiresAt);
 
             return new IpnResult("00", "Confirm Success");
         }
 
-        // ─── Tra trạng thái ─────────────────────────────────────────────────────
-
         public async Task<ApiResponse<PaymentStatusDto>> GetStatusAsync(string userId, string orderCode)
         {
-            var txn = await _unitOfWork.Repository<PaymentTransaction>()
-                .FirstOrDefaultAsync(t => t.OrderCode == orderCode && t.UserId == userId);
+            var repo = _unitOfWork.Repository<PaymentTransaction>();
+            var txn = await repo.FirstOrDefaultAsync(t => t.OrderCode == orderCode && t.UserId == userId);
 
             if (txn == null)
-                return ApiResponse<PaymentStatusDto>.FailureResult("Không tìm thấy giao dịch.");
+                return ApiResponse<PaymentStatusDto>.FailureResult("Khong tim thay giao dich.");
+
+            if (txn.Status == PaymentStatus.Pending
+                && string.Equals(txn.PaymentMethod, "BankTransfer", StringComparison.OrdinalIgnoreCase))
+            {
+                var matched = await _sePayVerifier.FindMatchAsync(txn, BuildTransferMemo(txn.OrderCode));
+                if (matched != null)
+                {
+                    var alreadyUsed = await repo.ExistsAsync(t =>
+                        t.ProviderTxnNo == matched.ProviderTxnNo
+                        && t.Status == PaymentStatus.Completed
+                        && t.OrderCode != txn.OrderCode);
+
+                    if (!alreadyUsed)
+                    {
+                        await ConfirmAsync(
+                            orderCode: txn.OrderCode,
+                            amountVnd: matched.AmountIn,
+                            succeeded: true,
+                            failureReason: null,
+                            providerTxnNo: matched.ProviderTxnNo,
+                            rawPayload: matched.RawPayload);
+
+                        txn = await repo.FirstOrDefaultAsync(t => t.OrderCode == orderCode && t.UserId == userId) ?? txn;
+                    }
+                    else
+                    {
+                        _logger.LogWarning("SePay transaction {ProviderTxnNo} was already used.", matched.ProviderTxnNo);
+                    }
+                }
+            }
 
             var user = await _userManager.FindByIdAsync(userId);
 
@@ -274,12 +314,49 @@ namespace MomOi.API.Services.Payment
             });
         }
 
-        /// <summary>
-        /// Mã đơn phải duy nhất, chỉ gồm chữ và số. Dấu thời gian bảo đảm không trùng giữa
-        /// các giây; bốn số ngẫu nhiên phòng hai giao dịch rơi vào cùng một giây. Với MoMo
-        /// điều này càng quan trọng vì bộ khoá thử nghiệm dùng chung partnerCode với nhiều bên.
-        /// </summary>
         private static string GenerateOrderCode() =>
             $"MOMOI{DateTime.UtcNow.AddHours(7):yyyyMMddHHmmss}{Random.Shared.Next(1000, 10000)}";
+
+        private async Task<string> GenerateUniqueOrderCodeAsync()
+        {
+            var repo = _unitOfWork.Repository<PaymentTransaction>();
+            for (var i = 0; i < 5; i++)
+            {
+                var orderCode = GenerateOrderCode();
+                if (!await repo.ExistsAsync(t => t.OrderCode == orderCode))
+                    return orderCode;
+            }
+
+            return $"{GenerateOrderCode()}{Guid.NewGuid():N}"[..32].ToUpperInvariant();
+        }
+
+        private static string BuildTransferMemo(string orderCode) => orderCode;
+
+        private string BuildVietQrUrl(decimal amount, string memo)
+        {
+            var sanitizedMemo = Regex.Replace(memo, "[^a-zA-Z0-9 ]", string.Empty).Trim();
+            var amountText = decimal.Truncate(amount).ToString("0", CultureInfo.InvariantCulture);
+            var accountName = Uri.EscapeDataString(_bankTransferOptions.AccountName);
+            var addInfo = Uri.EscapeDataString(sanitizedMemo);
+
+            var bankIdentifier = string.IsNullOrWhiteSpace(_bankTransferOptions.Bin)
+                ? _bankTransferOptions.BankId
+                : _bankTransferOptions.Bin;
+
+            return $"https://img.vietqr.io/image/{bankIdentifier}-{_bankTransferOptions.AccountNumber}-{_bankTransferOptions.VietQrTemplate}.png?amount={amountText}&addInfo={addInfo}&accountName={accountName}";
+        }
+
+        private BankTransferInfoDto BuildBankInfo() => new()
+        {
+            BankId = _bankTransferOptions.BankId,
+            Bin = _bankTransferOptions.Bin,
+            BankName = _bankTransferOptions.BankName,
+            BankShortName = _bankTransferOptions.BankShortName,
+            AccountNumber = _bankTransferOptions.AccountNumber,
+            AccountName = _bankTransferOptions.AccountName,
+            AccountHolderDisplay = string.IsNullOrWhiteSpace(_bankTransferOptions.AccountHolderDisplay)
+                ? _bankTransferOptions.AccountName
+                : _bankTransferOptions.AccountHolderDisplay
+        };
     }
 }
