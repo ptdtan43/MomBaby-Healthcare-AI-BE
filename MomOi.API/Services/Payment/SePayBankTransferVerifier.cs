@@ -71,7 +71,7 @@ namespace MomOi.API.Services.Payment
                 if (amountIn != txn.Amount)
                     continue;
 
-                if (!TryGetDate(tx, out var transactionDate) || transactionDate <= txn.CreatedAt)
+                if (!TryGetDate(tx, out var transactionDate) || IsTooOldForOrder(transactionDate, txn.CreatedAt))
                     continue;
 
                 var content = GetString(tx, "transaction_content", "content", "description") ?? string.Empty;
@@ -170,6 +170,21 @@ namespace MomOi.API.Services.Payment
 
             date = DateTime.SpecifyKind(date, DateTimeKind.Unspecified).AddHours(-7);
             return true;
+        }
+
+        private static bool IsTooOldForOrder(DateTime transactionDate, DateTime orderCreatedAt)
+        {
+            var normalizedTransactionDate = transactionDate.Kind == DateTimeKind.Utc
+                ? transactionDate
+                : DateTime.SpecifyKind(transactionDate, DateTimeKind.Utc);
+
+            var normalizedOrderCreatedAt = orderCreatedAt.Kind == DateTimeKind.Utc
+                ? orderCreatedAt
+                : DateTime.SpecifyKind(orderCreatedAt, DateTimeKind.Utc);
+
+            // Bank/SePay timestamps may be rounded to the minute, while orders are stored with seconds.
+            // Keep the "newer than order" safety check, but allow a small clock/precision tolerance.
+            return normalizedTransactionDate < normalizedOrderCreatedAt.AddMinutes(-5);
         }
 
         private static string Normalize(string value) =>
