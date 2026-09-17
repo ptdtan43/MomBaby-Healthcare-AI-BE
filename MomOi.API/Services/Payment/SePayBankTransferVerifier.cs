@@ -71,13 +71,24 @@ namespace MomOi.API.Services.Payment
                 if (amountIn != txn.Amount)
                     continue;
 
-                if (!TryGetDate(tx, out var transactionDate) || IsTooOldForOrder(transactionDate, txn.CreatedAt))
-                    continue;
-
                 var content = GetString(tx, "transaction_content", "content", "description") ?? string.Empty;
                 var compactContent = Normalize(content);
                 if (!compactContent.Contains(Normalize(txn.OrderCode), StringComparison.OrdinalIgnoreCase))
                     continue;
+
+                var transactionDate = DateTime.UtcNow;
+                if (TryGetDate(tx, out var parsedTransactionDate))
+                {
+                    if (IsTooOldForOrder(parsedTransactionDate, txn.CreatedAt))
+                        continue;
+
+                    transactionDate = parsedTransactionDate;
+                }
+                else
+                {
+                    _logger.LogWarning("SePay transaction {ProviderTxnNo} matched {OrderCode} by amount/content but transaction date could not be parsed. Raw: {RawPayload}",
+                        providerTxnNo, txn.OrderCode, tx.GetRawText());
+                }
 
                 return new SePayMatchedTransaction(
                     providerTxnNo,
@@ -155,14 +166,29 @@ namespace MomOi.API.Services.Payment
                 return false;
             }
 
-            raw = raw.Replace(' ', 'T');
-            if (!DateTime.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.None, out date))
+            raw = raw.Trim();
+            var normalizedRaw = raw.Replace(' ', 'T');
+            var formats = new[]
+            {
+                "yyyy-MM-dd'T'HH:mm:ss",
+                "yyyy-MM-dd'T'HH:mm",
+                "yyyy-MM-dd HH:mm:ss",
+                "yyyy-MM-dd HH:mm",
+                "dd/MM/yyyy HH:mm:ss",
+                "dd/MM/yyyy HH:mm",
+                "M/d/yyyy h:mm:ss tt",
+                "M/d/yyyy h:mm tt"
+            };
+
+            if (!DateTime.TryParseExact(raw, formats, CultureInfo.InvariantCulture, DateTimeStyles.None, out date)
+                && !DateTime.TryParse(normalizedRaw, CultureInfo.InvariantCulture, DateTimeStyles.None, out date)
+                && !DateTime.TryParse(raw, new CultureInfo("vi-VN"), DateTimeStyles.None, out date))
                 return false;
 
             if (date.Kind == DateTimeKind.Utc)
                 return true;
 
-            if (raw.EndsWith("Z", StringComparison.OrdinalIgnoreCase) || raw.Contains('+'))
+            if (normalizedRaw.EndsWith("Z", StringComparison.OrdinalIgnoreCase) || normalizedRaw.Contains('+'))
             {
                 date = date.ToUniversalTime();
                 return true;
