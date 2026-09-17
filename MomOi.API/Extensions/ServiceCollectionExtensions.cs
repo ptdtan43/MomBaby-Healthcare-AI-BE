@@ -232,7 +232,12 @@ namespace MomOi.API.Extensions
             {
                 options.AddPolicy("CorsPolicy", policy =>
                 {
-                    policy.WithOrigins("http://localhost:3000", "http://localhost:5173", "https://momoi.example.com")
+                    policy.WithOrigins(
+                              "http://localhost:3000",
+                              "http://localhost:5173",
+                              "https://momoi-fe-beta.vercel.app",
+                              "https://momoi.com.vn",
+                              "https://www.momoi.com.vn")
                           .AllowAnyHeader()
                           .AllowAnyMethod()
                           .AllowCredentials();
