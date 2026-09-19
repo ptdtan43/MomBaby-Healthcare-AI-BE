@@ -27,6 +27,12 @@ namespace MomOi.API.Services.Fertility
 
         public async Task<ApiResponse<object>> LogCycleAsync(string userId, DateTime periodStartDate, int cycleLength, string[] symptoms)
         {
+            if (cycleLength < 21 || cycleLength > 45)
+            {
+                return ApiResponse<object>.FailureResult("Do dai chu ky nen nam trong khoang 21-45 ngay.");
+            }
+
+            periodStartDate = DateTime.SpecifyKind(periodStartDate.Date, DateTimeKind.Utc);
             var profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId);
 
             if (profile == null)

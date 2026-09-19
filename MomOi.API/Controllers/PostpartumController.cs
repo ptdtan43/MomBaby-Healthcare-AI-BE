@@ -2,7 +2,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using MomOi.API.DTOs;
-
+using MomOi.API.Middleware;
+using MomOi.API.Models.Identity;
 using MomOi.API.Services.AI;
 using MomOi.API.Services.Postpartum;
 using System;
@@ -56,6 +57,7 @@ namespace MomOi.API.Controllers
         /// Submits answers to the 10 EPDS questions. Triggers BR05 rule evaluation and returns Gemini generated empathetic messages.
         /// </summary>
         [HttpPost("epds")]
+        [RequiresTier(SubscriptionTier.MomHienDai)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
         public async Task<IActionResult> SubmitEpds([FromBody] EpdsRequest request)
         {
@@ -76,6 +78,7 @@ namespace MomOi.API.Controllers
         /// Analyzes a spoken audio journal entry using Gemini 1.5 Pro multimodal capabilities.
         /// </summary>
         [HttpPost("epds/voice-journal")]
+        [RequiresTier(SubscriptionTier.SuperMomVip)]
         [ProducesResponseType(typeof(ApiResponse<VoiceJournalResult>), StatusCodes.Status200OK)]
         public async Task<IActionResult> AnalyzeVoiceJournal([FromBody] VoiceJournalRequest request)
         {
@@ -116,6 +119,7 @@ namespace MomOi.API.Controllers
         /// Generates pelvic floor, walking, and core workout plans based on recovery progress days.
         /// </summary>
         [HttpGet("recovery-plan")]
+        [RequiresTier(SubscriptionTier.MomHienDai)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetRecoveryPlan([FromQuery] int? day)
         {
@@ -130,6 +134,7 @@ namespace MomOi.API.Controllers
         /// Retrieves the latest EPDS survey result for the current user.
         /// </summary>
         [HttpGet("epds/latest")]
+        [RequiresTier(SubscriptionTier.MomHienDai)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetLatestEpds()
         {

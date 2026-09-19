@@ -88,12 +88,18 @@ namespace MomOi.API.Services.Pregnancy
         public async Task<ApiResponse<object>> GetThisWeekAsync(string userId)
         {
             var profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId);
-            if (profile == null || profile.Stage != JourneyStage.Pregnant || !profile.PregnancyWeek.HasValue)
+            if (profile == null || profile.Stage != JourneyStage.Pregnant)
             {
                 return ApiResponse<object>.FailureResult("Hồ sơ hiện tại không ở chế độ mang thai. Vui lòng thiết lập trước.");
             }
 
-            int week = profile.PregnancyWeek.Value;
+            var resolvedWeek = ResolvePregnancyWeek(profile);
+            if (!resolvedWeek.HasValue)
+            {
+                return ApiResponse<object>.FailureResult("Vui long cap nhat tuan thai hoac ngay kinh cuoi de xem noi dung phu hop.");
+            }
+
+            int week = resolvedWeek.Value;
             var milestoneData = GetMilestoneForWeek(week);
 
             return ApiResponse<object>.SuccessResult(milestoneData);
@@ -202,12 +208,18 @@ namespace MomOi.API.Services.Pregnancy
         public async Task<ApiResponse<object>> GetExercisePlanAsync(string userId)
         {
             var profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId);
-            if (profile == null || profile.Stage != JourneyStage.Pregnant || !profile.PregnancyWeek.HasValue)
+            if (profile == null || profile.Stage != JourneyStage.Pregnant)
             {
                 return ApiResponse<object>.FailureResult("Hồ sơ không ở chế độ thai kỳ để tính toán bài tập phù hợp.");
             }
 
-            int week = profile.PregnancyWeek.Value;
+            var resolvedWeek = ResolvePregnancyWeek(profile);
+            if (!resolvedWeek.HasValue)
+            {
+                return ApiResponse<object>.FailureResult("Vui long cap nhat tuan thai hoac ngay kinh cuoi de xem noi dung phu hop.");
+            }
+
+            int week = resolvedWeek.Value;
             object plan;
 
             if (week <= 12)
@@ -251,6 +263,25 @@ namespace MomOi.API.Services.Pregnancy
             }
 
             return ApiResponse<object>.SuccessResult(plan);
+        }
+
+        private static int? ResolvePregnancyWeek(MomHealthProfile profile)
+        {
+            if (profile.PregnancyWeek.HasValue)
+            {
+                return profile.PregnancyWeek.Value;
+            }
+
+            if (!profile.LastPeriodDate.HasValue)
+            {
+                return null;
+            }
+
+            var daysElapsed = (DateTime.UtcNow.Date - profile.LastPeriodDate.Value.Date).Days;
+            var week = (daysElapsed / 7) + 1;
+            if (week < 1) week = 1;
+            if (week > 42) week = 42;
+            return week;
         }
 
         public async Task<ApiResponse<object>> LogExerciseAsync(string userId, int stepCount, string exerciseType, int durationMinutes)
