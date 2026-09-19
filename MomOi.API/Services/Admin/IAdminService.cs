@@ -9,6 +9,7 @@ namespace MomOi.API.Services.Admin
     {
         Task<ApiResponse<object>> GetUsersAtRiskAsync();
         Task<ApiResponse<object>> GetReportsSummaryAsync();
+        Task<ApiResponse<object>> GetRevenueSummaryAsync();
 
         // User Management
         Task<ApiResponse<object>> GetAllUsersAsync();

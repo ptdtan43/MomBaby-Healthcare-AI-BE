@@ -284,5 +284,87 @@ namespace MomOi.API.Services.Admin
                 topTriggeredRules = topRules
             }, "Thống kê báo cáo thành công.");
         }
+
+        public async Task<ApiResponse<object>> GetRevenueSummaryAsync()
+        {
+            var now = DateTime.UtcNow;
+            var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+            var todayStart = now.Date;
+
+            var completedTransactions = await _context.PaymentTransactions
+                .Include(t => t.User)
+                .Where(t => t.Status == PaymentStatus.Completed)
+                .OrderByDescending(t => t.PaidAt ?? t.UpdatedAt)
+                .ToListAsync();
+
+            var totalRevenue = completedTransactions.Sum(t => t.Amount);
+            var monthlyRevenue = completedTransactions
+                .Where(t => (t.PaidAt ?? t.UpdatedAt) >= monthStart)
+                .Sum(t => t.Amount);
+            var todayRevenue = completedTransactions
+                .Where(t => (t.PaidAt ?? t.UpdatedAt) >= todayStart)
+                .Sum(t => t.Amount);
+
+            var byPlan = completedTransactions
+                .GroupBy(t => new { t.PlanCode, t.TargetTier, t.DurationMonths })
+                .Select(g => new
+                {
+                    planCode = g.Key.PlanCode,
+                    tier = g.Key.TargetTier.ToString(),
+                    durationMonths = g.Key.DurationMonths,
+                    transactionCount = g.Count(),
+                    revenue = g.Sum(t => t.Amount)
+                })
+                .OrderByDescending(x => x.revenue)
+                .ToList();
+
+            var monthlyTrend = completedTransactions
+                .Where(t => (t.PaidAt ?? t.UpdatedAt) >= monthStart.AddMonths(-5))
+                .GroupBy(t =>
+                {
+                    var paidAt = t.PaidAt ?? t.UpdatedAt;
+                    return new DateTime(paidAt.Year, paidAt.Month, 1);
+                })
+                .Select(g => new
+                {
+                    month = g.Key.ToString("yyyy-MM"),
+                    revenue = g.Sum(t => t.Amount),
+                    transactionCount = g.Count()
+                })
+                .OrderBy(x => x.month)
+                .ToList();
+
+            var recentTransactions = completedTransactions
+                .Take(10)
+                .Select(t => new
+                {
+                    t.Id,
+                    t.OrderCode,
+                    t.PlanCode,
+                    tier = t.TargetTier.ToString(),
+                    t.DurationMonths,
+                    t.Amount,
+                    t.Currency,
+                    t.PaymentMethod,
+                    t.ProviderTxnNo,
+                    t.PaidAt,
+                    userId = t.UserId,
+                    userEmail = t.User?.Email,
+                    userName = t.User?.FullName
+                })
+                .ToList();
+
+            return ApiResponse<object>.SuccessResult(new
+            {
+                totalRevenue,
+                monthlyRevenue,
+                todayRevenue,
+                completedTransactionCount = completedTransactions.Count,
+                payingUserCount = completedTransactions.Select(t => t.UserId).Distinct().Count(),
+                byPlan,
+                monthlyTrend,
+                recentTransactions
+            }, "Thong ke doanh thu thanh cong.");
+        }
     }
 }

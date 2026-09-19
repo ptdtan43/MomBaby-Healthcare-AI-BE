@@ -141,6 +141,16 @@ namespace MomOi.API.Controllers
             var response = await _adminService.GetReportsSummaryAsync();
             return Ok(response);
         }
+
+        /// <summary>Retrieves payment revenue summary from completed transactions.</summary>
+        [Authorize(Roles = AppRoles.Admin)]
+        [HttpGet("revenue/summary")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetRevenueSummary()
+        {
+            var response = await _adminService.GetRevenueSummaryAsync();
+            return Ok(response);
+        }
     }
 }
 
