@@ -23,6 +23,11 @@ namespace MomOi.API.DTOs.Auth
         public SubscriptionTier Tier { get; set; }
 
         /// <summary>
+        /// Subscription expiration date for paid tiers.
+        /// </summary>
+        public DateTime? TierExpiresAt { get; set; }
+
+        /// <summary>
         /// Roles assigned to the user (e.g. "Mom", "Admin", "Expert", "Staff").
         /// </summary>
         public IList<string> Roles { get; set; } = new List<string>();

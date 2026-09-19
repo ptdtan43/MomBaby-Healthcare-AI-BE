@@ -379,5 +379,95 @@ namespace MomOi.API.Services.Admin
                 recentTransactions
             }, "Thong ke doanh thu thanh cong.");
         }
+
+        public async Task<ApiResponse<object>> GetPaymentTransactionsAsync(string? status, string? email, DateTime? from, DateTime? to)
+        {
+            var query = _context.PaymentTransactions
+                .Include(t => t.User)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<PaymentStatus>(status, true, out var parsedStatus))
+            {
+                query = query.Where(t => t.Status == parsedStatus);
+            }
+
+            if (!string.IsNullOrWhiteSpace(email))
+            {
+                var keyword = email.Trim().ToLower();
+                query = query.Where(t =>
+                    t.User.Email != null && t.User.Email.ToLower().Contains(keyword));
+            }
+
+            if (from.HasValue)
+            {
+                var fromDate = DateTime.SpecifyKind(from.Value.Date, DateTimeKind.Utc);
+                query = query.Where(t => (t.PaidAt ?? t.UpdatedAt) >= fromDate);
+            }
+
+            if (to.HasValue)
+            {
+                var toDate = DateTime.SpecifyKind(to.Value.Date.AddDays(1), DateTimeKind.Utc);
+                query = query.Where(t => (t.PaidAt ?? t.UpdatedAt) < toDate);
+            }
+
+            var transactions = await query
+                .OrderByDescending(t => t.PaidAt ?? t.UpdatedAt)
+                .Take(500)
+                .Select(t => new
+                {
+                    t.Id,
+                    t.OrderCode,
+                    t.PlanCode,
+                    tier = t.TargetTier.ToString(),
+                    t.DurationMonths,
+                    t.Amount,
+                    t.Currency,
+                    t.PaymentMethod,
+                    status = t.Status.ToString(),
+                    t.ProviderTxnNo,
+                    t.FailureReason,
+                    t.CreatedAt,
+                    t.UpdatedAt,
+                    t.PaidAt,
+                    userId = t.UserId,
+                    userEmail = t.User.Email,
+                    userName = t.User.FullName
+                })
+                .ToListAsync();
+
+            return ApiResponse<object>.SuccessResult(new
+            {
+                total = transactions.Count,
+                statuses = Enum.GetNames(typeof(PaymentStatus)),
+                completedRevenue = transactions
+                    .Where(t => string.Equals(t.status, PaymentStatus.Completed.ToString(), StringComparison.OrdinalIgnoreCase))
+                    .Sum(t => t.Amount),
+                transactions
+            }, "Lay danh sach giao dich thanh cong.");
+        }
+
+        public async Task<ApiResponse<object>> GetFeedbackTicketsAsync()
+        {
+            var tickets = await _context.NotificationAlerts
+                .Include(a => a.User)
+                .Where(a => a.Message.StartsWith("[FEEDBACK]"))
+                .OrderByDescending(a => a.CreatedAt)
+                .Take(200)
+                .Select(a => new
+                {
+                    a.Id,
+                    a.UserId,
+                    userEmail = a.User.Email,
+                    userName = a.User.FullName,
+                    a.Message,
+                    severity = a.Severity.ToString(),
+                    status = a.Status.ToString(),
+                    a.CreatedAt,
+                    a.UpdatedAt
+                })
+                .ToListAsync();
+
+            return ApiResponse<object>.SuccessResult(tickets, "Lay danh sach phan hoi thanh cong.");
+        }
     }
 }

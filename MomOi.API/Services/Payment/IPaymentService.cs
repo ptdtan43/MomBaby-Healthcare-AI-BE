@@ -24,5 +24,7 @@ namespace MomOi.API.Services.Payment
         Task<IpnResult> HandleMoMoIpnAsync(MoMoIpnDto dto);
 
         Task<ApiResponse<PaymentStatusDto>> GetStatusAsync(string userId, string orderCode);
+
+        Task<ApiResponse<object>> GetHistoryAsync(string userId);
     }
 }

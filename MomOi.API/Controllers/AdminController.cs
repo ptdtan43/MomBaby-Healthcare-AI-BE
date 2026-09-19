@@ -151,6 +151,30 @@ namespace MomOi.API.Controllers
             var response = await _adminService.GetRevenueSummaryAsync();
             return Ok(response);
         }
+
+        /// <summary>Retrieves payment transactions for admin reconciliation.</summary>
+        [Authorize(Roles = AppRoles.Admin)]
+        [HttpGet("payments/transactions")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetPaymentTransactions(
+            [FromQuery] string? status,
+            [FromQuery] string? email,
+            [FromQuery] DateTime? from,
+            [FromQuery] DateTime? to)
+        {
+            var response = await _adminService.GetPaymentTransactionsAsync(status, email, from, to);
+            return Ok(response);
+        }
+
+        /// <summary>Retrieves user feedback tickets submitted from the app.</summary>
+        [Authorize(Roles = AppRoles.Admin + "," + AppRoles.Staff)]
+        [HttpGet("feedback")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetFeedbackTickets()
+        {
+            var response = await _adminService.GetFeedbackTicketsAsync();
+            return Ok(response);
+        }
     }
 }
 

@@ -314,6 +314,41 @@ namespace MomOi.API.Services.Payment
             });
         }
 
+        public async Task<ApiResponse<object>> GetHistoryAsync(string userId)
+        {
+            var transactions = await _unitOfWork.Repository<PaymentTransaction>()
+                .FindAsync(t => t.UserId == userId);
+
+            var user = await _userManager.FindByIdAsync(userId);
+            var result = transactions
+                .OrderByDescending(t => t.CreatedAt)
+                .Select(t => new
+                {
+                    t.Id,
+                    t.OrderCode,
+                    t.PlanCode,
+                    tier = t.TargetTier.ToString(),
+                    t.DurationMonths,
+                    t.Amount,
+                    t.Currency,
+                    t.PaymentMethod,
+                    status = t.Status.ToString(),
+                    t.ProviderTxnNo,
+                    t.FailureReason,
+                    t.CreatedAt,
+                    t.UpdatedAt,
+                    t.PaidAt
+                })
+                .ToList();
+
+            return ApiResponse<object>.SuccessResult(new
+            {
+                currentTier = user?.EffectiveTier.ToString() ?? SubscriptionTier.Free.ToString(),
+                tierExpiresAt = user?.TierExpiresAt,
+                transactions = result
+            }, "Lay lich su thanh toan thanh cong.");
+        }
+
         private static string GenerateOrderCode() =>
             $"MOMOI{DateTime.UtcNow.AddHours(7):yyyyMMddHHmmss}{Random.Shared.Next(1000, 10000)}";
 

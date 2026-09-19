@@ -119,5 +119,15 @@ namespace MomOi.API.Controllers
             var response = await _paymentService.GetStatusAsync(GetUserId(), orderCode);
             return response.Success ? Ok(response) : NotFound(response);
         }
+
+        /// <summary>Returns the authenticated user's payment and subscription history.</summary>
+        [HttpGet("history")]
+        [Authorize]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetHistory()
+        {
+            var response = await _paymentService.GetHistoryAsync(GetUserId());
+            return Ok(response);
+        }
     }
 }
