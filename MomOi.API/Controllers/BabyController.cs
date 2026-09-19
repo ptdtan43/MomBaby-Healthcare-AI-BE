@@ -2,7 +2,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using MomOi.API.DTOs;
+using MomOi.API.Middleware;
 using MomOi.API.Models.Health;
+using MomOi.API.Models.Identity;
 using MomOi.API.Services.Baby;
 using MomOi.API.Services.BusinessRules;
 using System.Collections.Generic;
@@ -15,6 +17,7 @@ namespace MomOi.API.Controllers
     /// Controller for managing baby profiles and tracking growth milestones.
     /// </summary>
     [Authorize]
+    [RequiresTier(SubscriptionTier.MomHienDai)]
     [ApiController]
     [Route("api/baby")]
     public class BabyController : ControllerBase
