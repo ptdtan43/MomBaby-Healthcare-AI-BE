@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -212,7 +213,7 @@ namespace MomOi.API.Services.AI
             }
         }
 
-        public async Task<string> GenerateJsonAsync(string prompt)
+        public async Task<string> GenerateJsonAsync(string prompt, string? imageBase64OrUrl = null, string? mimeType = null)
         {
             if (string.IsNullOrEmpty(_apiKey))
             {
@@ -223,7 +224,7 @@ namespace MomOi.API.Services.AI
 
             // Send the caller's prompt as-is: no conversational persona is added, so the model
             // is free to obey the JSON-only instruction contained in the prompt.
-            var raw = await CallGeminiTextApiAsync(prompt, jsonMode: true);
+            var raw = await CallGeminiContentApiAsync(prompt, imageBase64OrUrl, mimeType, jsonMode: true);
 
             // The model often wraps JSON in a markdown code fence — strip it before parsing.
             return raw.Replace("```json", "").Replace("```", "").Trim();
@@ -310,15 +311,85 @@ Trả về ĐÚNG MỘT khối JSON MẢNG (Array) hợp lệ:
         /// Khi true, ép Gemini trả về đúng JSON (responseMimeType = application/json)
         /// nên không còn phải bóc code fence và không sợ model trả văn xuôi.
         /// </param>
-        private async Task<string> CallGeminiTextApiAsync(string prompt, bool jsonMode = false)
+        private async Task<string> CallGeminiContentApiAsync(
+            string prompt,
+            string? imageBase64OrUrl = null,
+            string? mimeType = null,
+            bool jsonMode = false)
         {
             var requestUrl = $"https://generativelanguage.googleapis.com/v1beta/models/{_textModel}:generateContent?key={_apiKey}";
 
-            // Gemini 2.5 bật "thinking" mặc định khiến 1 lượt gọi mất ~18s và vượt timeout của client.
-            // Tắt thinking giảm còn ~8s mà chất lượng câu trả lời không giảm.
+            // Gemini 2.5 bat "thinking" mac dinh khien 1 luot goi mat ~18s va vuot timeout cua client.
+            // Tat thinking giam con ~8s ma chat luong cau tra loi khong giam.
             object generationConfig = jsonMode
                 ? new { thinkingConfig = new { thinkingBudget = 0 }, responseMimeType = "application/json" }
                 : (object)new { thinkingConfig = new { thinkingBudget = 0 } };
+
+            var parts = new List<object>();
+
+            // Xu ly anh dinh kem neu co (multimodal)
+            if (!string.IsNullOrWhiteSpace(imageBase64OrUrl))
+            {
+                try
+                {
+                    string? cleanBase64 = null;
+                    string detectedMime = mimeType ?? "image/jpeg";
+
+                    if (imageBase64OrUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                        imageBase64OrUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var imageBytes = await _httpClient.GetByteArrayAsync(imageBase64OrUrl);
+                        cleanBase64 = Convert.ToBase64String(imageBytes);
+
+                        if (string.IsNullOrWhiteSpace(mimeType))
+                        {
+                            if (imageBase64OrUrl.EndsWith(".webp", StringComparison.OrdinalIgnoreCase)) detectedMime = "image/webp";
+                            else if (imageBase64OrUrl.EndsWith(".png", StringComparison.OrdinalIgnoreCase)) detectedMime = "image/png";
+                            else detectedMime = "image/jpeg";
+                        }
+                    }
+                    else if (imageBase64OrUrl.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var commaIndex = imageBase64OrUrl.IndexOf(',');
+                        if (commaIndex >= 0)
+                        {
+                            var header = imageBase64OrUrl.Substring(5, commaIndex - 5);
+                            var semiIndex = header.IndexOf(';');
+                            detectedMime = semiIndex >= 0 ? header.Substring(0, semiIndex) : header;
+                            cleanBase64 = imageBase64OrUrl.Substring(commaIndex + 1);
+                        }
+                        else
+                        {
+                            cleanBase64 = imageBase64OrUrl;
+                        }
+                    }
+                    else
+                    {
+                        cleanBase64 = imageBase64OrUrl;
+                    }
+
+                    detectedMime = detectedMime.Trim().ToLowerInvariant();
+                    if (detectedMime == "image/jpg") detectedMime = "image/jpeg";
+
+                    if (!string.IsNullOrWhiteSpace(cleanBase64))
+                    {
+                        parts.Add(new
+                        {
+                            inlineData = new
+                            {
+                                mimeType = detectedMime,
+                                data = cleanBase64
+                            }
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to parse or fetch image for Gemini. Proceeding with text prompt only.");
+                }
+            }
+
+            parts.Add(new { text = prompt });
 
             var requestBody = new
             {
@@ -326,10 +397,7 @@ Trả về ĐÚNG MỘT khối JSON MẢNG (Array) hợp lệ:
                 {
                     new
                     {
-                        parts = new[]
-                        {
-                            new { text = prompt }
-                        }
+                        parts = parts.ToArray()
                     }
                 },
                 generationConfig
@@ -345,6 +413,7 @@ Trả về ĐÚNG MỘT khối JSON MẢNG (Array) hợp lệ:
             if (!response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
+                _logger.LogError("Gemini API error ({StatusCode}): {Error}", response.StatusCode, errorContent);
                 throw new HttpRequestException($"Gemini API error ({response.StatusCode}): {errorContent}");
             }
 
@@ -358,6 +427,11 @@ Trả về ĐÚNG MỘT khối JSON MẢNG (Array) hợp lệ:
                 .GetString();
 
             return text?.Trim() ?? string.Empty;
+        }
+
+        private Task<string> CallGeminiTextApiAsync(string prompt, bool jsonMode = false)
+        {
+            return CallGeminiContentApiAsync(prompt, null, null, jsonMode);
         }
 
         private string GetEpdsFallback(int score)

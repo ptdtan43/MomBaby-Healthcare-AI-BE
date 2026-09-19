@@ -43,7 +43,7 @@ namespace MomOi.API.Services.AI
         /// (markdown code fences stripped). Throws when the API key is missing or the call fails,
         /// so callers handle the failure explicitly instead of silently receiving fallback prose.
         /// </summary>
-        Task<string> GenerateJsonAsync(string prompt);
+        Task<string> GenerateJsonAsync(string prompt, string? imageBase64OrUrl = null, string? mimeType = null);
 
         /// <summary>
         /// Generates a single personalized diet recipe via AI.

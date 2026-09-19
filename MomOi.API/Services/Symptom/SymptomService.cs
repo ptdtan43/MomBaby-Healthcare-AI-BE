@@ -64,7 +64,7 @@ namespace MomOi.API.Services.Symptom
 
             try
             {
-                aiResponseJson = await _geminiService.GenerateJsonAsync(prompt);
+                aiResponseJson = await _geminiService.GenerateJsonAsync(prompt, request.ImageUrl, request.ImageMimeType);
 
                 using var doc = System.Text.Json.JsonDocument.Parse(aiResponseJson);
                 if (doc.RootElement.TryGetProperty("severityScore", out var scoreEl))
@@ -95,7 +95,7 @@ namespace MomOi.API.Services.Symptom
             {
                 UserId = userId,
                 TextDescription = request.TextDescription,
-                Images = Array.Empty<string>(),
+                Images = !string.IsNullOrWhiteSpace(request.ImageUrl) ? new[] { request.ImageUrl } : Array.Empty<string>(),
                 ProfileStage = profileStage,
                 ImageUrl = request.ImageUrl,
                 ImageMimeType = request.ImageMimeType,
