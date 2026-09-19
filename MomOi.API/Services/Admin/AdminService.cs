@@ -318,20 +318,33 @@ namespace MomOi.API.Services.Admin
                 .OrderByDescending(x => x.revenue)
                 .ToList();
 
-            var monthlyTrend = completedTransactions
-                .Where(t => (t.PaidAt ?? t.UpdatedAt) >= monthStart.AddMonths(-5))
-                .GroupBy(t =>
+            var trendStart = todayStart.AddDays(-13);
+            var revenueByDay = completedTransactions
+                .Where(t => (t.PaidAt ?? t.UpdatedAt) >= trendStart)
+                .GroupBy(t => (t.PaidAt ?? t.UpdatedAt).Date)
+                .ToDictionary(
+                    g => g.Key,
+                    g => new
+                    {
+                        revenue = g.Sum(t => t.Amount),
+                        transactionCount = g.Count()
+                    });
+
+            var monthlyTrend = Enumerable.Range(0, 14)
+                .Select(offset =>
                 {
-                    var paidAt = t.PaidAt ?? t.UpdatedAt;
-                    return new DateTime(paidAt.Year, paidAt.Month, 1);
+                    var date = trendStart.AddDays(offset);
+                    var hasData = revenueByDay.TryGetValue(date, out var data);
+                    var revenue = hasData ? data!.revenue : 0;
+                    var transactionCount = hasData ? data!.transactionCount : 0;
+
+                    return new
+                    {
+                        month = date.ToString("yyyy-MM-dd"),
+                        revenue,
+                        transactionCount
+                    };
                 })
-                .Select(g => new
-                {
-                    month = g.Key.ToString("yyyy-MM"),
-                    revenue = g.Sum(t => t.Amount),
-                    transactionCount = g.Count()
-                })
-                .OrderBy(x => x.month)
                 .ToList();
 
             var recentTransactions = completedTransactions
