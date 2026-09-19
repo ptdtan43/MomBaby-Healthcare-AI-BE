@@ -95,15 +95,57 @@ namespace MomOi.API.Controllers
         {
             var tracks = new List<object>
             {
-                new { id = "rain-breath", title = "Mưa nhẹ & nhịp thở", durationMinutes = 10, tone = 196, modulation = 0.12, noise = 0.16, color = "pink" },
-                new { id = "ocean-rest", title = "Sóng êm sau sinh", durationMinutes = 12, tone = 174, modulation = 0.08, noise = 0.22, color = "emerald" },
-                new { id = "night-calm", title = "Ru ngủ dịu sâu", durationMinutes = 15, tone = 220, modulation = 0.05, noise = 0.1, color = "violet" }
+                new
+                {
+                    id = "piano-lullaby",
+                    title = "Piano nhẹ cho mẹ nghỉ",
+                    description = "Giai điệu piano chậm, ấm và ít nốt để thư giãn trước khi ngủ.",
+                    durationMinutes = 15,
+                    mode = "piano",
+                    modeLabel = "Piano dịu",
+                    tone = 261.63,
+                    bpm = 52,
+                    chords = new[] { 0, 7, 9, 5 },
+                    noise = 0.03,
+                    color = "pink",
+                    audioUrl = (string?)null
+                },
+                new
+                {
+                    id = "lofi-mom-care",
+                    title = "Beat nhẹ chăm sóc mẹ",
+                    description = "Beat lofi rất mềm, bass thấp và piano rải hợp âm nhẹ.",
+                    durationMinutes = 12,
+                    mode = "lofi",
+                    modeLabel = "Lofi beat",
+                    tone = 220.0,
+                    bpm = 64,
+                    chords = new[] { 0, 3, 7, 5 },
+                    noise = 0.05,
+                    color = "violet",
+                    audioUrl = (string?)null
+                },
+                new
+                {
+                    id = "rain-piano",
+                    title = "Mưa nhỏ & piano xa",
+                    description = "Nền mưa mỏng kết hợp tiếng piano thưa để giảm căng thẳng.",
+                    durationMinutes = 10,
+                    mode = "nature-piano",
+                    modeLabel = "Mưa + piano",
+                    tone = 196.0,
+                    bpm = 48,
+                    chords = new[] { 0, 5, 9, 7 },
+                    noise = 0.16,
+                    color = "emerald",
+                    audioUrl = (string?)null
+                }
             };
 
             return Ok(ApiResponse<object>.SuccessResult(new
             {
                 title = "Âm thanh phục hồi thư giãn",
-                description = "Các track ambient được tạo trong trình duyệt để hỗ trợ thư giãn, không thay thế trị liệu y khoa.",
+                description = "Thư viện piano, beat nhẹ và âm thanh thiên nhiên hỗ trợ thư giãn, không thay thế trị liệu y khoa.",
                 tracks
             }));
         }
