@@ -14,32 +14,23 @@ namespace MomOi.API.Services.Pregnancy
 {
     public class PregnancyService : IPregnancyService
     {
-        private readonly IGenericRepository<MomHealthProfile> _profileRepo;
-        private readonly IGenericRepository<MealLog> _mealRepo;
-        private readonly IGenericRepository<PregnancyLog> _pregLogRepo;
-        private readonly IGenericRepository<ExerciseLog> _exerciseRepo;
+        private readonly IUnitOfWork _unitOfWork;
         private readonly IBusinessRuleEngine _ruleEngine;
         private readonly NutritionProxyService _nutritionProxy;
 
         public PregnancyService(
-            IGenericRepository<MomHealthProfile> profileRepo,
-            IGenericRepository<MealLog> mealRepo,
-            IGenericRepository<PregnancyLog> pregLogRepo,
-            IGenericRepository<ExerciseLog> exerciseRepo,
+            IUnitOfWork unitOfWork,
             IBusinessRuleEngine ruleEngine,
             NutritionProxyService nutritionProxy)
         {
-            _profileRepo = profileRepo;
-            _mealRepo = mealRepo;
-            _pregLogRepo = pregLogRepo;
-            _exerciseRepo = exerciseRepo;
+            _unitOfWork = unitOfWork;
             _ruleEngine = ruleEngine;
             _nutritionProxy = nutritionProxy;
         }
 
         public async Task<ApiResponse<object>> SetupPregnancyAsync(string userId, DateTime lastMenstrualPeriod, DateTime? dueDate)
         {
-            var profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId);
+            var profile = await _unitOfWork.Repository<MomHealthProfile>().FirstOrDefaultAsync(p => p.UserId == userId);
             
             if (profile == null)
             {
@@ -50,14 +41,14 @@ namespace MomOi.API.Services.Pregnancy
                     LastPeriodDate = lastMenstrualPeriod,
                     UpdatedAt = DateTime.UtcNow
                 };
-                await _profileRepo.AddAsync(profile);
+                await _unitOfWork.Repository<MomHealthProfile>().AddAsync(profile);
             }
             else
             {
                 profile.Stage = JourneyStage.Pregnant;
                 profile.LastPeriodDate = lastMenstrualPeriod;
                 profile.UpdatedAt = DateTime.UtcNow;
-                _profileRepo.Update(profile);
+                _unitOfWork.Repository<MomHealthProfile>().Update(profile);
             }
 
             var daysElapsed = (DateTime.UtcNow - lastMenstrualPeriod).Days;
@@ -69,7 +60,7 @@ namespace MomOi.API.Services.Pregnancy
 
             profile.PregnancyWeek = week;
             profile.DeliveryDate = calcDueDate;
-            await _profileRepo.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
 
             var trimester = week <= 12 ? 1 : (week <= 27 ? 2 : 3);
             var milestone = $"Tuần {week}: Bé đang hình thành và phát triển tích cực.";
@@ -87,7 +78,7 @@ namespace MomOi.API.Services.Pregnancy
 
         public async Task<ApiResponse<object>> GetThisWeekAsync(string userId)
         {
-            var profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId);
+            var profile = await _unitOfWork.Repository<MomHealthProfile>().FirstOrDefaultAsync(p => p.UserId == userId);
             if (profile == null || profile.Stage != JourneyStage.Pregnant)
             {
                 return ApiResponse<object>.FailureResult("Hồ sơ hiện tại không ở chế độ mang thai. Vui lòng thiết lập trước.");
@@ -107,7 +98,7 @@ namespace MomOi.API.Services.Pregnancy
 
         public async Task<ApiResponse<object>> LogFoodAsync(string userId, string[] foods)
         {
-            var profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId);
+            var profile = await _unitOfWork.Repository<MomHealthProfile>().FirstOrDefaultAsync(p => p.UserId == userId);
             if (profile == null) return ApiResponse<object>.FailureResult("Hồ sơ sức khỏe không tồn tại.");
 
             var mealLog = new MealLog
@@ -118,8 +109,8 @@ namespace MomOi.API.Services.Pregnancy
                 FoodItems = foods,
                 Calories = 250f
             };
-            await _mealRepo.AddAsync(mealLog);
-            await _mealRepo.SaveChangesAsync();
+            await _unitOfWork.Repository<MealLog>().AddAsync(mealLog);
+            await _unitOfWork.SaveChangesAsync();
 
             var alerts = await _ruleEngine.EvaluateAsync(profile);
             var br02Alerts = alerts.Where(a => a.RuleId == "BR02").ToList();
@@ -161,7 +152,7 @@ namespace MomOi.API.Services.Pregnancy
 
         public async Task<ApiResponse<object>> LogWeightAsync(string userId, float weightKg, DateTime date)
         {
-            var profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId);
+            var profile = await _unitOfWork.Repository<MomHealthProfile>().FirstOrDefaultAsync(p => p.UserId == userId);
             if (profile == null) return ApiResponse<object>.FailureResult("Hồ sơ sức khỏe không tồn tại.");
 
             var pregnancyLog = new PregnancyLog
@@ -171,7 +162,7 @@ namespace MomOi.API.Services.Pregnancy
                 Weight = weightKg,
                 RecordedAt = date
             };
-            await _pregLogRepo.AddAsync(pregnancyLog);
+            await _unitOfWork.Repository<PregnancyLog>().AddAsync(pregnancyLog);
 
             if (profile.Height.HasValue && profile.Height.Value > 0)
             {
@@ -179,14 +170,17 @@ namespace MomOi.API.Services.Pregnancy
                 profile.Bmi = weightKg / (heightM * heightM);
             }
             profile.UpdatedAt = DateTime.UtcNow;
-            _profileRepo.Update(profile);
+            _unitOfWork.Repository<MomHealthProfile>().Update(profile);
 
-            await _profileRepo.SaveChangesAsync();
+            // Ghi PregnancyLog và cập nhật BMI trên MomHealthProfile là MỘT nghiệp vụ.
+            // Bản cũ gọi _profileRepo.SaveChangesAsync() và PregnancyLog "tình cờ" cũng
+            // được lưu, chỉ vì hai repository dùng chung DbContext. Nay ý định được nói rõ.
+            await _unitOfWork.SaveChangesAsync();
 
             var alerts = await _ruleEngine.EvaluateAsync(profile);
             var br04Alert = alerts.FirstOrDefault(a => a.RuleId == "BR04");
 
-            var weightLogs = await _pregLogRepo.FindAsync(p => p.UserId == userId && p.Weight.HasValue);
+            var weightLogs = await _unitOfWork.Repository<PregnancyLog>().FindAsync(p => p.UserId == userId && p.Weight.HasValue);
             var firstWeightLog = weightLogs.OrderBy(p => p.RecordedAt).FirstOrDefault();
 
             float totalGain = 0f;
@@ -207,7 +201,7 @@ namespace MomOi.API.Services.Pregnancy
 
         public async Task<ApiResponse<object>> GetExercisePlanAsync(string userId)
         {
-            var profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId);
+            var profile = await _unitOfWork.Repository<MomHealthProfile>().FirstOrDefaultAsync(p => p.UserId == userId);
             if (profile == null || profile.Stage != JourneyStage.Pregnant)
             {
                 return ApiResponse<object>.FailureResult("Hồ sơ không ở chế độ thai kỳ để tính toán bài tập phù hợp.");
@@ -286,7 +280,7 @@ namespace MomOi.API.Services.Pregnancy
 
         public async Task<ApiResponse<object>> LogExerciseAsync(string userId, int stepCount, string exerciseType, int durationMinutes)
         {
-            var profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId);
+            var profile = await _unitOfWork.Repository<MomHealthProfile>().FirstOrDefaultAsync(p => p.UserId == userId);
             if (profile == null) return ApiResponse<object>.FailureResult("Hồ sơ sức khỏe không tồn tại.");
 
             var log = new ExerciseLog
@@ -297,8 +291,8 @@ namespace MomOi.API.Services.Pregnancy
                 DurationMinutes = durationMinutes,
                 RecordedAt = DateTime.UtcNow
             };
-            await _exerciseRepo.AddAsync(log);
-            await _exerciseRepo.SaveChangesAsync();
+            await _unitOfWork.Repository<ExerciseLog>().AddAsync(log);
+            await _unitOfWork.SaveChangesAsync();
 
             var alerts = await _ruleEngine.EvaluateAsync(profile);
             var br03Alerts = alerts.Where(a => a.RuleId == "BR03").ToList();
@@ -308,7 +302,7 @@ namespace MomOi.API.Services.Pregnancy
 
         public async Task<ApiResponse<object>> GetWeightLogsAsync(string userId)
         {
-            var logs = await _pregLogRepo.FindAsync(p => p.UserId == userId && p.Weight.HasValue);
+            var logs = await _unitOfWork.Repository<PregnancyLog>().FindAsync(p => p.UserId == userId && p.Weight.HasValue);
             var sortedLogs = logs.OrderBy(l => l.RecordedAt)
                                  .Select(l => new {
                                      week = l.Week,
@@ -321,7 +315,7 @@ namespace MomOi.API.Services.Pregnancy
         public async Task<ApiResponse<object>> GetTodayStepsAsync(string userId)
         {
             var today = DateTime.UtcNow.Date;
-            var logs = await _exerciseRepo.FindAsync(e => e.UserId == userId && e.RecordedAt >= today);
+            var logs = await _unitOfWork.Repository<ExerciseLog>().FindAsync(e => e.UserId == userId && e.RecordedAt >= today);
             int totalSteps = logs.Sum(e => e.StepCount);
             return ApiResponse<object>.SuccessResult(new { todaySteps = totalSteps });
         }

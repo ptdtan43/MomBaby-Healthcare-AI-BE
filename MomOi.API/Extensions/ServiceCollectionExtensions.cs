@@ -24,6 +24,7 @@ using MomOi.API.Services.DailyMonitoring;
 using MomOi.API.Services.Dashboard;
 using MomOi.API.Services.Diet;
 using MomOi.API.Services.Expert;
+using MomOi.API.Services.Feedback;
 using MomOi.API.Services.Fertility;
 using MomOi.API.Services.Integration;
 using MomOi.API.Services.Lifestyle;
@@ -38,6 +39,7 @@ using MomOi.API.Services.Recipe;
 using MomOi.API.Services.Report;
 using MomOi.API.Services.Symptom;
 using MomOi.API.Services.UserProfile;
+using MomOi.API.Services.Wellness;
 using System;
 using System.IO;
 using System.Reflection;
@@ -156,6 +158,8 @@ namespace MomOi.API.Extensions
             services.AddScoped<IAuthService, AuthService>();
             services.AddScoped<IMomService, MomService>();
             services.AddScoped<IBusinessRuleEngine, BusinessRuleEngine>();
+            services.AddScoped<IWellnessService, WellnessService>();
+            services.AddScoped<IFeedbackService, FeedbackService>();
 
             // Thanh toán. BindConfiguration tự lấy IConfiguration từ DI nên không cần truyền vào.
             services.AddOptions<VnPayOptions>().BindConfiguration(VnPayOptions.SectionName);

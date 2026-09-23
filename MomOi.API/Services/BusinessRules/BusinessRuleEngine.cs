@@ -498,10 +498,48 @@ namespace MomOi.API.Services.BusinessRules
 
         #region Helpers
 
+        /// <summary>
+        /// Khoảng thời gian coi hai cảnh báo CÙNG RULE của CÙNG NGƯỜI DÙNG là trùng nhau.
+        ///
+        /// Vì sao Critical ngắn hơn hẳn: cảnh báo nguy kịch (dị ứng ở trẻ, trầm cảm sau
+        /// sinh) có thể tái phát trong ngày vì một nguyên nhân MỚI. Chặn cả ngày là che
+        /// mất sự kiện thật. 30 phút đủ để dập spam do người dùng tải lại màn hình,
+        /// nhưng vẫn để lọt một đợt nguy kịch mới.
+        /// </summary>
+        private static readonly TimeSpan CriticalDedupWindow = TimeSpan.FromMinutes(30);
+        private static readonly TimeSpan WarningDedupWindow = TimeSpan.FromHours(24);
+
         private async Task LogAlertAndPushAsync(string userId, HealthAlert alert)
         {
-            // Log critical/warning alerts to DB
-            if ((alert.Severity == AlertSeverity.Critical || alert.Severity == AlertSeverity.Warning) && _context != null)
+            var shouldPersist = alert.Severity == AlertSeverity.Critical
+                             || alert.Severity == AlertSeverity.Warning;
+
+            // ── IDEMPOTENCY ──────────────────────────────────────────────────────
+            // EvaluateAsync được gọi mỗi lần người dùng mở màn hình. Không có chốt
+            // chặn này thì tải lại trang 3 lần = 3 bản ghi cảnh báo trùng + 3 lần đẩy
+            // thông báo. Cùng một tình trạng sức khoẻ chỉ nên cảnh báo MỘT lần.
+            if (shouldPersist && _context != null)
+            {
+                var window = alert.Severity == AlertSeverity.Critical
+                    ? CriticalDedupWindow
+                    : WarningDedupWindow;
+                var since = alert.TriggeredAt - window;
+
+                var alreadyRaised = await _context.CriticalAlertLogs
+                    .AnyAsync(l => l.UserId == userId
+                                && l.RuleId == alert.RuleId
+                                && l.TriggeredAt >= since);
+
+                if (alreadyRaised)
+                {
+                    _logger?.LogDebug(
+                        "Bỏ qua cảnh báo trùng {RuleId} cho người dùng {UserId} (đã cảnh báo trong {Minutes} phút gần đây).",
+                        alert.RuleId, userId, window.TotalMinutes);
+                    return; // không ghi DB, cũng không đẩy thông báo
+                }
+            }
+
+            if (shouldPersist && _context != null)
             {
                 var log = new CriticalAlertLog
                 {

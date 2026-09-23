@@ -7,7 +7,7 @@ namespace MomOi.API.Models.Health
     /// A single medication reminder schedule for a user.
     /// Maps from MongoDB MedSchedule schema (including nested AdherenceLog).
     /// </summary>
-    public class MedicationSchedule : BaseEntity
+    public class MedicationSchedule : SoftDeletableEntity
     {
         public string UserId { get; set; } = string.Empty;
         public AppUser User { get; set; } = null!;
@@ -34,7 +34,7 @@ namespace MomOi.API.Models.Health
     /// <summary>
     /// Records whether a medication dose was taken or skipped on a given date.
     /// </summary>
-    public class MedicationAdherenceLog : BaseEntity
+    public class MedicationAdherenceLog : SoftDeletableEntity
     {
         public int MedicationScheduleId { get; set; }
 

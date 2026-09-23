@@ -128,6 +128,13 @@ namespace MomOi.API.Services.Medication
                 return ApiResponse<object>.FailureResult("Không tìm thấy lịch uống thuốc.");
             }
 
+            // Xoá mềm KHÔNG kích hoạt ON DELETE CASCADE của database, vì lệnh gửi
+            // xuống là UPDATE chứ không phải DELETE. Nên phải tự xoá mềm bản ghi con,
+            // nếu không MedicationAdherenceLog sẽ trỏ tới một lịch thuốc đã bị ẩn.
+            var adherenceLogs = await _unitOfWork.Repository<MedicationAdherenceLog>()
+                .FindAsync(a => a.MedicationScheduleId == id);
+
+            _unitOfWork.Repository<MedicationAdherenceLog>().RemoveRange(adherenceLogs);
             _unitOfWork.Repository<MedicationSchedule>().Remove(schedule);
             await _unitOfWork.SaveChangesAsync();
 

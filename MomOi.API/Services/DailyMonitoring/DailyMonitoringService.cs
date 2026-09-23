@@ -11,20 +11,14 @@ namespace MomOi.API.Services.DailyMonitoring
 {
     public class DailyMonitoringService : IDailyMonitoringService
     {
-        private readonly IGenericRepository<MomHealthProfile> _profileRepo;
-        private readonly IGenericRepository<DailyMonitoringLog> _logRepo;
-        private readonly IGenericRepository<LifestyleAlert> _alertRepo;
+        private readonly IUnitOfWork _unitOfWork;
         private readonly IBusinessRuleEngine _ruleEngine;
 
         public DailyMonitoringService(
-            IGenericRepository<MomHealthProfile> profileRepo,
-            IGenericRepository<DailyMonitoringLog> logRepo,
-            IGenericRepository<LifestyleAlert> alertRepo,
+            IUnitOfWork unitOfWork,
             IBusinessRuleEngine ruleEngine)
         {
-            _profileRepo = profileRepo;
-            _logRepo = logRepo;
-            _alertRepo = alertRepo;
+            _unitOfWork = unitOfWork;
             _ruleEngine = ruleEngine;
         }
 
@@ -33,7 +27,7 @@ namespace MomOi.API.Services.DailyMonitoring
             var today = DateTime.UtcNow.Date;
             var logDate = request.Date.HasValue ? request.Date.Value.Date : today;
 
-            var existing = await _logRepo.FirstOrDefaultAsync(d => d.UserId == userId && d.Date == logDate);
+            var existing = await _unitOfWork.Repository<DailyMonitoringLog>().FirstOrDefaultAsync(d => d.UserId == userId && d.Date == logDate);
 
             if (existing != null)
             {
@@ -60,7 +54,7 @@ namespace MomOi.API.Services.DailyMonitoring
                 if (request.AllergySymptomLogged.HasValue) existing.AllergySymptomLogged = request.AllergySymptomLogged.Value;
                 if (request.NewFoodLogged != null) existing.NewFoodLogged = request.NewFoodLogged;
                 existing.UpdatedAt = DateTime.UtcNow;
-                _logRepo.Update(existing);
+                _unitOfWork.Repository<DailyMonitoringLog>().Update(existing);
             }
             else
             {
@@ -93,21 +87,27 @@ namespace MomOi.API.Services.DailyMonitoring
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
                 };
-                await _logRepo.AddAsync(existing);
+                await _unitOfWork.Repository<DailyMonitoringLog>().AddAsync(existing);
             }
 
-            await _logRepo.SaveChangesAsync();
+            // COMMIT 1 — bắt buộc, không gộp được xuống dưới vì hai lý do:
+            //  (a) existing.Id chỉ có giá trị thật SAU khi database sinh khoá; bên dưới
+            //      cần Id đó để gán cho LifestyleAlert.DailyMonitoringLogId.
+            //  (b) "Lưu nhật ký" và "sinh cảnh báo" là hai nghiệp vụ có mức độ quan
+            //      trọng khác nhau: nhật ký của mẹ phải được lưu kể cả khi rule engine
+            //      lỗi (khối try/catch bên dưới nuốt lỗi).
+            await _unitOfWork.SaveChangesAsync();
 
             try
             {
-                var profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId);
+                var profile = await _unitOfWork.Repository<MomHealthProfile>().FirstOrDefaultAsync(p => p.UserId == userId);
 
                 if (profile != null)
                 {
                     var triggeredRules = await _ruleEngine.EvaluateAsync(profile);
 
-                    var allAlerts = await _alertRepo.FindAsync(a => a.UserId == userId);
-                    _alertRepo.RemoveRange(allAlerts);
+                    var allAlerts = await _unitOfWork.Repository<LifestyleAlert>().FindAsync(a => a.UserId == userId);
+                    _unitOfWork.Repository<LifestyleAlert>().RemoveRange(allAlerts);
 
                     foreach (var rule in triggeredRules)
                     {
@@ -125,10 +125,10 @@ namespace MomOi.API.Services.DailyMonitoring
                             CreatedAt = DateTime.UtcNow,
                             UpdatedAt = DateTime.UtcNow
                         };
-                        await _alertRepo.AddAsync(alert);
+                        await _unitOfWork.Repository<LifestyleAlert>().AddAsync(alert);
                     }
 
-                    await _alertRepo.SaveChangesAsync();
+                    await _unitOfWork.SaveChangesAsync();
                 }
             }
             catch (Exception ex)
@@ -142,7 +142,7 @@ namespace MomOi.API.Services.DailyMonitoring
         public async Task<ApiResponse<object>> GetTodayMonitoringAsync(string userId)
         {
             var today = DateTime.UtcNow.Date;
-            var entry = await _logRepo.FirstOrDefaultAsync(d => d.UserId == userId && d.Date == today);
+            var entry = await _unitOfWork.Repository<DailyMonitoringLog>().FirstOrDefaultAsync(d => d.UserId == userId && d.Date == today);
 
             return ApiResponse<object>.SuccessResult(new
             {
@@ -153,7 +153,7 @@ namespace MomOi.API.Services.DailyMonitoring
 
         public async Task<ApiResponse<object>> GetHistoryAsync(string userId, int limit)
         {
-            var allLogs = await _logRepo.FindAsync(d => d.UserId == userId);
+            var allLogs = await _unitOfWork.Repository<DailyMonitoringLog>().FindAsync(d => d.UserId == userId);
             var history = allLogs.OrderByDescending(d => d.Date).Take(limit).ToList();
 
             return ApiResponse<object>.SuccessResult(history, "Lấy lịch sử nhật ký thành công.");
@@ -162,7 +162,7 @@ namespace MomOi.API.Services.DailyMonitoring
         public async Task<ApiResponse<object>> GetInsightsAsync(string userId, int days)
         {
             var startDate = DateTime.UtcNow.Date.AddDays(-days);
-            var allLogs = await _logRepo.FindAsync(d => d.UserId == userId && d.Date >= startDate);
+            var allLogs = await _unitOfWork.Repository<DailyMonitoringLog>().FindAsync(d => d.UserId == userId && d.Date >= startDate);
             var history = allLogs.OrderByDescending(d => d.Date).ToList();
 
             if (!history.Any())

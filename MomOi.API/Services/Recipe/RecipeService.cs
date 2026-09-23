@@ -18,24 +18,24 @@ namespace MomOi.API.Services.Recipe
 
         public async Task<ApiResponse<object>> GetMyRecipesAsync(string userId, bool? isSaved, MomOi.API.Models.Health.RecipeCategory? category = null, int page = 1, int limit = 20)
         {
-            var all = await _unitOfWork.Repository<MomOi.API.Models.Health.Recipe>()
-                .FindAsync(r => r.UserId == userId 
-                    && (!isSaved.HasValue || r.IsSaved == isSaved.Value)
-                    && (!category.HasValue || r.Category == category.Value));
-
-            var total = all.Count();
-            var recipes = all
-                .OrderByDescending(r => r.CreatedAt)
-                .Skip((page - 1) * limit)
-                .Take(limit)
-                .ToList();
+            // Phân trang được đẩy xuống database: COUNT(*) + ORDER BY + LIMIT/OFFSET.
+            // Bản cũ tải TOÀN BỘ công thức của user về RAM rồi mới cắt trang.
+            var paged = await _unitOfWork.Repository<MomOi.API.Models.Health.Recipe>()
+                .GetPagedAsync(
+                    page: page,
+                    pageSize: limit,
+                    predicate: r => r.UserId == userId
+                        && (!isSaved.HasValue || r.IsSaved == isSaved.Value)
+                        && (!category.HasValue || r.Category == category.Value),
+                    orderBy: q => q.OrderByDescending(r => r.CreatedAt));
 
             return ApiResponse<object>.SuccessResult(new
             {
-                total,
-                page,
-                limit,
-                recipes
+                total = paged.TotalItems,
+                page = paged.Page,
+                limit = paged.PageSize,
+                totalPages = paged.TotalPages,
+                recipes = paged.Items
             }, "Tải danh sách thực đơn thành công.");
         }
 

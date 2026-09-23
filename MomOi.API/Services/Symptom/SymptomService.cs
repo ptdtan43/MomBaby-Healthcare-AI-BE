@@ -15,22 +15,16 @@ namespace MomOi.API.Services.Symptom
 {
     public class SymptomService : ISymptomService
     {
-        private readonly IGenericRepository<MomHealthProfile> _profileRepo;
-        private readonly IGenericRepository<SymptomLog> _symptomRepo;
-        private readonly IGenericRepository<NotificationAlert> _alertRepo;
+        private readonly IUnitOfWork _unitOfWork;
         private readonly IGeminiService _geminiService;
         private readonly ILogger<SymptomService> _logger;
 
         public SymptomService(
-            IGenericRepository<MomHealthProfile> profileRepo,
-            IGenericRepository<SymptomLog> symptomRepo,
-            IGenericRepository<NotificationAlert> alertRepo,
+            IUnitOfWork unitOfWork,
             IGeminiService geminiService,
             ILogger<SymptomService> logger)
         {
-            _profileRepo = profileRepo;
-            _symptomRepo = symptomRepo;
-            _alertRepo = alertRepo;
+            _unitOfWork = unitOfWork;
             _geminiService = geminiService;
             _logger = logger;
         }
@@ -44,7 +38,7 @@ namespace MomOi.API.Services.Symptom
 
             var startTime = DateTime.UtcNow;
 
-            var profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId);
+            var profile = await _unitOfWork.Repository<MomHealthProfile>().FirstOrDefaultAsync(p => p.UserId == userId);
             var profileStage = profile?.Stage.ToString() ?? "unknown";
 
             var prompt = $"Bạn là chuyên gia tư vấn sức khỏe sản khoa. Phân tích các triệu chứng sau của mẹ " +
@@ -110,11 +104,11 @@ namespace MomOi.API.Services.Symptom
                 UpdatedAt = DateTime.UtcNow
             };
 
-            await _symptomRepo.AddAsync(log);
+            await _unitOfWork.Repository<SymptomLog>().AddAsync(log);
 
             if (severityScore >= 70)
             {
-                await _alertRepo.AddAsync(new NotificationAlert
+                await _unitOfWork.Repository<NotificationAlert>().AddAsync(new NotificationAlert
                 {
                     UserId = log.UserId,
                     Type = NotificationAlertType.Symptom,
@@ -126,8 +120,11 @@ namespace MomOi.API.Services.Symptom
                 });
             }
 
-            await _symptomRepo.SaveChangesAsync();
-            await _alertRepo.SaveChangesAsync();
+            // SymptomLog và NotificationAlert (nếu có) thuộc cùng một nghiệp vụ
+            // "ghi nhận triệu chứng" => commit đúng MỘT lần.
+            // Bản cũ gọi save hai lần trên hai repository khác nhau; vì cả hai dùng
+            // chung một DbContext nên lần thứ hai thực chất không làm gì cả.
+            await _unitOfWork.SaveChangesAsync();
 
             var message = aiSucceeded
                 ? "Ghi nhận triệu chứng và phân tích AI thành công."
@@ -157,7 +154,7 @@ namespace MomOi.API.Services.Symptom
 
         public async Task<ApiResponse<object>> GetSymptomEntriesAsync(string userId, int? minSeverity)
         {
-            var allEntries = await _symptomRepo.FindAsync(s => s.UserId == userId);
+            var allEntries = await _unitOfWork.Repository<SymptomLog>().FindAsync(s => s.UserId == userId);
             var query = allEntries.AsEnumerable();
 
             if (minSeverity.HasValue)
@@ -171,7 +168,7 @@ namespace MomOi.API.Services.Symptom
 
         public async Task<ApiResponse<object>> GetSymptomEntryByIdAsync(string userId, int id)
         {
-            var entry = await _symptomRepo.FirstOrDefaultAsync(s => s.Id == id && s.UserId == userId);
+            var entry = await _unitOfWork.Repository<SymptomLog>().FirstOrDefaultAsync(s => s.Id == id && s.UserId == userId);
 
             if (entry == null)
                 return ApiResponse<object>.FailureResult("Không tìm thấy bản ghi triệu chứng.");

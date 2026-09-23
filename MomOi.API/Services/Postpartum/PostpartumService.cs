@@ -12,29 +12,23 @@ namespace MomOi.API.Services.Postpartum
 {
     public class PostpartumService : IPostpartumService
     {
-        private readonly IGenericRepository<MomHealthProfile> _profileRepo;
-        private readonly IGenericRepository<EpdsAssessment> _epdsRepo;
-        private readonly IGenericRepository<PostpartumLog> _logRepo;
+        private readonly IUnitOfWork _unitOfWork;
         private readonly IBusinessRuleEngine _businessRuleEngine;
         private readonly IGeminiService _geminiService;
 
         public PostpartumService(
-            IGenericRepository<MomHealthProfile> profileRepo,
-            IGenericRepository<EpdsAssessment> epdsRepo,
-            IGenericRepository<PostpartumLog> logRepo,
+            IUnitOfWork unitOfWork,
             IBusinessRuleEngine businessRuleEngine,
             IGeminiService geminiService)
         {
-            _profileRepo = profileRepo;
-            _epdsRepo = epdsRepo;
-            _logRepo = logRepo;
+            _unitOfWork = unitOfWork;
             _businessRuleEngine = businessRuleEngine;
             _geminiService = geminiService;
         }
 
         public async Task<ApiResponse<object>> SetupPostpartumAsync(string userId, DateTime deliveryDate, string deliveryType, bool isBreastfeeding)
         {
-            var profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId);
+            var profile = await _unitOfWork.Repository<MomHealthProfile>().FirstOrDefaultAsync(p => p.UserId == userId);
 
             if (profile == null)
             {
@@ -46,7 +40,7 @@ namespace MomOi.API.Services.Postpartum
                     IsBreastfeeding = isBreastfeeding,
                     UpdatedAt = DateTime.UtcNow
                 };
-                await _profileRepo.AddAsync(profile);
+                await _unitOfWork.Repository<MomHealthProfile>().AddAsync(profile);
             }
             else
             {
@@ -54,10 +48,10 @@ namespace MomOi.API.Services.Postpartum
                 profile.DeliveryDate = deliveryDate;
                 profile.IsBreastfeeding = isBreastfeeding;
                 profile.UpdatedAt = DateTime.UtcNow;
-                _profileRepo.Update(profile);
+                _unitOfWork.Repository<MomHealthProfile>().Update(profile);
             }
 
-            await _profileRepo.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
 
             var daysPostpartum = (DateTime.UtcNow.Date - deliveryDate.Date).Days;
             if (daysPostpartum < 0) daysPostpartum = 0;
@@ -90,7 +84,7 @@ namespace MomOi.API.Services.Postpartum
 
         public async Task<ApiResponse<object>> SubmitEpdsAsync(string userId, int[] answers)
         {
-            var profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId);
+            var profile = await _unitOfWork.Repository<MomHealthProfile>().FirstOrDefaultAsync(p => p.UserId == userId);
 
             if (profile == null)
             {
@@ -116,8 +110,11 @@ namespace MomOi.API.Services.Postpartum
                     AiAnalysis = $"Score: {evaluation.TotalScore}. Analysis: {aiMessage}"
                 };
 
-                await _epdsRepo.AddAsync(epds);
-                await _epdsRepo.SaveChangesAsync();
+                await _unitOfWork.Repository<EpdsAssessment>().AddAsync(epds);
+                // Phải commit TRƯỚC khi gọi rule engine: BR05 truy vấn bảng EpdsAssessment
+                // để lấy bài đánh giá mới nhất. Entity còn nằm trong ChangeTracker mà chưa
+                // commit thì câu SELECT đó không nhìn thấy.
+                await _unitOfWork.SaveChangesAsync();
 
                 await _businessRuleEngine.EvaluateAsync(profile);
 
@@ -160,8 +157,8 @@ namespace MomOi.API.Services.Postpartum
                 Notes = $"Bú sữa bên: {side}, Thời lượng: {durationMinutes} phút, Lúc: {time:HH:mm}"
             };
 
-            await _logRepo.AddAsync(postpartumLog);
-            await _logRepo.SaveChangesAsync();
+            await _unitOfWork.Repository<PostpartumLog>().AddAsync(postpartumLog);
+            await _unitOfWork.SaveChangesAsync();
 
             var result = new
             {
@@ -227,13 +224,13 @@ namespace MomOi.API.Services.Postpartum
 
         public async Task<ApiResponse<object>> GetLatestEpdsAsync(string userId)
         {
-            var profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId);
+            var profile = await _unitOfWork.Repository<MomHealthProfile>().FirstOrDefaultAsync(p => p.UserId == userId);
             if (profile == null)
             {
                 return ApiResponse<object>.FailureResult("Không tìm thấy hồ sơ sức khỏe.");
             }
 
-            var assessments = await _epdsRepo.FindAsync(e => e.ProfileId == profile.Id);
+            var assessments = await _unitOfWork.Repository<EpdsAssessment>().FindAsync(e => e.ProfileId == profile.Id);
             var latest = assessments.OrderByDescending(e => e.TakenAt).FirstOrDefault();
 
             if (latest == null)

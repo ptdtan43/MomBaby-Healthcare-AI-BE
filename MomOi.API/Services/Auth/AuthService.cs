@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
-using MomOi.API.Data;
+using MomOi.API.Repositories;
 using MomOi.API.DTOs.Auth;
 using MomOi.API.Models.Health;
 using MomOi.API.Models.Identity;
@@ -21,18 +21,18 @@ namespace MomOi.API.Services.Auth
     {
         private readonly UserManager<AppUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
-        private readonly AppDbContext _context;
+        private readonly IUnitOfWork _unitOfWork;
         private readonly IConfiguration _configuration;
 
         public AuthService(
             UserManager<AppUser> userManager,
             RoleManager<IdentityRole> roleManager,
-            AppDbContext context,
+            IUnitOfWork unitOfWork,
             IConfiguration configuration)
         {
             _userManager = userManager;
             _roleManager = roleManager;
-            _context = context;
+            _unitOfWork = unitOfWork;
             _configuration = configuration;
         }
 
@@ -71,8 +71,8 @@ namespace MomOi.API.Services.Auth
                 UpdatedAt = DateTime.UtcNow
             };
 
-            _context.MomHealthProfiles.Add(healthProfile);
-            await _context.SaveChangesAsync();
+            await _unitOfWork.Repository<MomHealthProfile>().AddAsync(healthProfile);
+            await _unitOfWork.SaveChangesAsync();
 
             // Generate JWT and Refresh token
             var token = await GenerateJwtTokenAsync(user);

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -235,25 +236,54 @@ namespace MomOi.API.Services.Payment
                 return new IpnResult("01", "Order not found");
             }
 
-            var startFrom = user.TierExpiresAt is { } expiry && expiry > DateTime.UtcNow
-                ? expiry
-                : DateTime.UtcNow;
-
-            user.Tier = txn.TargetTier;
-            user.TierExpiresAt = startFrom.AddMonths(txn.DurationMonths);
-
-            var updateResult = await _userManager.UpdateAsync(user);
-            if (!updateResult.Succeeded)
+            // ── NÂNG HẠNG GÓI VÀ CHỐT ĐƠN PHẢI LÀ MỘT KHỐI NGUYÊN TỬ ───────────────
+            // Bản cũ commit hai lần rời nhau: nâng tier cho user trước, chốt đơn sau.
+            // Nếu lần commit thứ hai hỏng, user ĐÃ được cộng hạn nhưng đơn vẫn Pending
+            // => cổng thanh toán retry IPN, qua được cửa kiểm tra "đã xử lý chưa",
+            //    và cộng thêm một chu kỳ nữa MIỄN PHÍ.
+            try
             {
-                _logger.LogError("Cannot update tier for user {UserId}: {Errors}",
-                    user.Id, string.Join("; ", updateResult.Errors.Select(e => e.Description)));
+                await _unitOfWork.ExecuteInTransactionAsync(async () =>
+                {
+                    var startFrom = user.TierExpiresAt is { } expiry && expiry > DateTime.UtcNow
+                        ? expiry
+                        : DateTime.UtcNow;
+
+                    user.Tier = txn.TargetTier;
+                    user.TierExpiresAt = startFrom.AddMonths(txn.DurationMonths);
+
+                    // UserManager dùng chung AppDbContext (AddEntityFrameworkStores) nên
+                    // lệnh UPDATE của nó nằm trong cùng transaction đang mở.
+                    var updateResult = await _userManager.UpdateAsync(user);
+                    if (!updateResult.Succeeded)
+                    {
+                        // Ném ngoại lệ để transaction rollback — KHÔNG return, vì return
+                        // sẽ commit mất phần đã ghi.
+                        throw new InvalidOperationException(
+                            "Cannot update tier: " +
+                            string.Join("; ", updateResult.Errors.Select(e => e.Description)));
+                    }
+
+                    txn.Status = PaymentStatus.Completed;
+                    txn.PaidAt = DateTime.UtcNow;
+                    repo.Update(txn);
+                    await _unitOfWork.SaveChangesAsync();
+                });
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                // Khoá lạc quan (xmin) đã chặn: một IPN khác vừa ghi nhận đơn này xong
+                // trước ta vài mili giây. Không phải lỗi — trả về đúng mã "đã xử lý".
+                _logger.LogWarning("Payment {OrderCode} was confirmed concurrently by another request.", orderCode);
+                return new IpnResult("02", "Order already confirmed");
+            }
+            catch (Exception ex)
+            {
+                // Đã rollback sạch: user chưa được nâng hạng, đơn vẫn Pending.
+                // Cổng thanh toán sẽ retry và lần sau xử lý lại từ đầu một cách an toàn.
+                _logger.LogError(ex, "Failed to confirm payment {OrderCode}; transaction rolled back.", orderCode);
                 return new IpnResult("99", "Failed to update account");
             }
-
-            txn.Status = PaymentStatus.Completed;
-            txn.PaidAt = DateTime.UtcNow;
-            repo.Update(txn);
-            await _unitOfWork.SaveChangesAsync();
 
             _logger.LogInformation("Payment {OrderCode} completed. User {UserId} tier {Tier} until {Expiry}.",
                 orderCode, user.Id, user.Tier, user.TierExpiresAt);

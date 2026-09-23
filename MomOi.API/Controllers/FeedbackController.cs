@@ -1,11 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using MomOi.API.Data;
 using MomOi.API.DTOs;
 using MomOi.API.DTOs.Feedback;
-using MomOi.API.Models.Health;
-using System;
+using MomOi.API.Services.Feedback;
 using System.Security.Claims;
 using System.Threading.Tasks;
 
@@ -16,56 +14,27 @@ namespace MomOi.API.Controllers
     [Route("api/feedback")]
     public class FeedbackController : ControllerBase
     {
-        private readonly AppDbContext _context;
+        private readonly IFeedbackService _feedbackService;
 
-        public FeedbackController(AppDbContext context)
+        public FeedbackController(IFeedbackService feedbackService)
         {
-            _context = context;
+            _feedbackService = feedbackService;
         }
 
         [HttpGet("options")]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-        public IActionResult GetOptions()
-        {
-            return Ok(ApiResponse<object>.SuccessResult(new
-            {
-                categories = new[]
-                {
-                    new { value = "Bug", label = "Lỗi chức năng" },
-                    new { value = "Payment", label = "Thanh toán / gói" },
-                    new { value = "Content", label = "Nội dung chăm sóc" },
-                    new { value = "Idea", label = "Ý tưởng mới" }
-                }
-            }));
-        }
+        public IActionResult GetOptions() => Ok(_feedbackService.GetOptions());
 
         [HttpPost]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
         public async Task<IActionResult> Create([FromBody] CreateFeedbackDto dto)
         {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrWhiteSpace(userId))
-                return Unauthorized(ApiResponse<object>.FailureResult("Vui long dang nhap lai."));
+                return Unauthorized(ApiResponse<object>.FailureResult("Vui lòng đăng nhập lại."));
 
-            if (string.IsNullOrWhiteSpace(dto.Message) || dto.Message.Trim().Length < 8)
-                return BadRequest(ApiResponse<object>.FailureResult("Noi dung phan hoi qua ngan."));
-
-            var alert = new NotificationAlert
-            {
-                UserId = userId,
-                Type = NotificationAlertType.RoutineCheck,
-                Severity = AlertSeverity.Warning,
-                Status = NotificationStatus.Pending,
-                Channels = new[] { "AdminDashboard" },
-                Message = $"[FEEDBACK] Category={dto.Category?.Trim() ?? "General"}; Page={dto.Page?.Trim() ?? "Unknown"}; Message={dto.Message.Trim()}",
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            };
-
-            _context.NotificationAlerts.Add(alert);
-            await _context.SaveChangesAsync();
-
-            return Ok(ApiResponse<object>.SuccessResult(new { alert.Id }, "Da gui phan hoi thanh cong."));
+            var response = await _feedbackService.CreateAsync(userId, dto);
+            return response.Success ? Ok(response) : BadRequest(response);
         }
     }
 }
