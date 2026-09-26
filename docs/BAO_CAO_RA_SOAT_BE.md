@@ -73,7 +73,7 @@ cùng khái niệm** — nên sửa gộp cùng lúc để tránh sửa mâu thu
 
 > Các mục **không làm là nguy hiểm thật**. Mỗi mục nhỏ và độc lập, có thể làm trong 1 ngày.
 
-### [ ] 1.1. Revoke token SePay và mật khẩu DB đang bị commit lên Git
+### [x] 1.1. 🔄 ĐÃ SỬA CODE (2026-09-23) — Revoke token SePay và mật khẩu DB đang bị commit lên Git
 
 > 🧠 **Khái niệm 1 — Secret Management & 12-Factor App** · Anh em cùng khái niệm: 1.2, 1.6
 
@@ -86,15 +86,17 @@ Hai giá trị bị lộ:
 Các secret khác (`Jwt`, `MoMo`, `VnPay`, `Gemini`, `Usda`) đã để rỗng và đẩy ra env — **phần này làm đúng rồi**, chỉ còn 2 cái trên.
 
 **Việc cần làm:**
-- [ ] Vào dashboard SePay **revoke token cũ**, tạo token mới
-- [ ] Đổi mật khẩu PostgreSQL
-- [ ] Chuyển cả hai sang biến môi trường (`Payment__BankTransfer__SepayApiToken`, `ConnectionStrings__DefaultConnection`)
-- [ ] Để giá trị rỗng `""` trong `appsettings.json` như các secret khác
+- [x] Để giá trị rỗng `""` trong `appsettings.json` — **9/9 secret trong file được commit nay đều rỗng**
+- [x] `AddDatabase` đổi thành **fail-fast thật sự**: dùng `IsNullOrWhiteSpace` thay cho `?? throw`, vì `GetConnectionString` trả **chuỗi rỗng** chứ không phải `null` khi khoá tồn tại mà để trống → app từng khởi động được rồi mới chết ở truy vấn đầu tiên
+- [x] Đã kiểm chứng: chạy Production không có chuỗi kết nối → app **từ chối khởi động** kèm thông báo chỉ rõ cách sửa
+- [ ] ⚠️ **VIỆC CỦA EM:** vào dashboard SePay **revoke token cũ**, tạo token mới
+- [ ] ⚠️ **VIỆC CỦA EM:** đổi mật khẩu PostgreSQL trên Railway
+- [ ] ⚠️ **VIỆC CỦA EM:** đặt `Payment__BankTransfer__SepayApiToken` và `ConnectionStrings__DefaultConnection` trong Railway Variables **trước khi deploy bản này**
 - [ ] ⚠️ **Lưu ý:** xóa khỏi file là chưa đủ — giá trị cũ vẫn nằm trong lịch sử Git. Bắt buộc phải revoke.
 
 ---
 
-### [ ] 1.2. Chặn seed tài khoản admin mặc định ở môi trường production
+### [x] 1.2. 🔄 ĐÃ SỬA CODE (2026-09-23) — Chặn seed tài khoản admin mặc định ở môi trường production
 
 > 🧠 **Khái niệm 1 — Secret Management & 12-Factor App** · Anh em cùng khái niệm: 1.1, 1.6
 
@@ -119,9 +121,12 @@ Mà `RunMigrationsOnStartup = "true"` bật trong cả `appsettings.json` lẫn 
 > đều biết đường vào và biết sẵn mật khẩu Admin. **Đây mới là lỗ hổng thật, không phải Swagger.**
 
 **Việc cần làm:**
-- [ ] ⚠️ **NGAY HÔM NAY:** thử đăng nhập `admin@momoi.com` / `Admin@123` trên production — vào được thì đổi mật khẩu lập tức (cả 3 tài khoản admin/staff/expert)
-- [ ] Chỉ seed khi `IsDevelopment()`, HOẶC
-- [ ] Lấy mật khẩu từ biến môi trường và bắt đổi mật khẩu ở lần đăng nhập đầu tiên
+- [x] Viết lại `DbInitializer`: tách **role** (luôn seed, vô hại) khỏi **tài khoản** (có mật khẩu)
+- [x] Mật khẩu lấy từ cấu hình `Seed:AdminPassword` / `Seed:StaffPassword` / `Seed:ExpertPassword`
+- [x] Không cấu hình + **không phải Development** → **BỎ QUA tạo tài khoản** và ghi cảnh báo, tuyệt đối không dùng mật khẩu mặc định
+- [x] Tài khoản đã tồn tại → chỉ đảm bảo đúng role, **không ghi đè mật khẩu** quản trị viên đã đổi
+- [x] Đã xoá mật khẩu `Admin@123` / `Staff@123` / `Expert@123` khỏi mã nguồn
+- [ ] 🔴 **VIỆC CỦA EM, GẤP:** code mới chỉ chặn việc TẠO MỚI. Tài khoản đã seed trên production **vẫn còn nguyên mật khẩu cũ** — phải tự đăng nhập và đổi
 
 ---
 
@@ -715,11 +720,11 @@ Cập nhật mỗi khi hoàn thành một mục.
 
 | Nhóm | Tổng mục | Đã xong | Tiến độ |
 |---|:---:|:---:|---|
-| 🔴 Nhóm 1 — Khẩn cấp | 6 | 1 | `██░░░░░░░░` 17% |
+| 🔴 Nhóm 1 — Khẩn cấp | 6 | 3 | `█████░░░░░` 50% |
 | 🟠 Nhóm 2 — Nghiệp vụ | 10 | 1 | `█░░░░░░░░░` 10% |
 | 🟡 Nhóm 3 — Kiến trúc | 13 | 4 | `███░░░░░░░` 31% |
 | 🐛 Build warning | 4 | 0 | `░░░░░░░░░░` 0% |
-| **TỔNG** | **33** | **6** | `██░░░░░░░░` **18%** |
+| **TỔNG** | **33** | **8** | `██░░░░░░░░` **24%** |
 
 ---
 

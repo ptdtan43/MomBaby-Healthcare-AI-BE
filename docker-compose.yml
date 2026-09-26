@@ -13,6 +13,13 @@ services:
       - UsdaApiKey=${USDA_API_KEY}
       - NutritionApiUrl=http://nutrition-api:8001
       - RunMigrationsOnStartup=true
+      # Khoá ký JWT. Thiếu hai biến này, app sẽ tự sinh khoá RSA trong RAM
+      # => mỗi lần khởi động lại là toàn bộ người dùng bị đăng xuất.
+      - Jwt__PrivateKey=${JWT_PRIVATE_KEY}
+      - Jwt__PublicKey=${JWT_PUBLIC_KEY}
+      # Mật khẩu tài khoản nền. KHÔNG đặt thì DbInitializer bỏ qua việc tạo
+      # tài khoản, thay vì dùng mật khẩu mặc định (xem Data/DbInitializer.cs).
+      - Seed__AdminPassword=${SEED_ADMIN_PASSWORD}
       - EnableSwagger=true
     depends_on:
       - pgdb
@@ -36,7 +43,10 @@ services:
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=MomOiDb
+      # Tên database phải KHỚP CHÍNH XÁC với Database= trong chuỗi kết nối ở trên.
+      # PostgreSQL phân biệt hoa thường với tên được tạo trong dấu nháy kép,
+      # nên MomOiDb và momoidb là HAI database khác nhau.
+      - POSTGRES_DB=momoidb
     volumes:
       - pgdb_data:/var/lib/postgresql/data
 

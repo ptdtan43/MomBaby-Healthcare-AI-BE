@@ -57,8 +57,21 @@ namespace MomOi.API.Extensions
 
         public static IServiceCollection AddDatabase(this IServiceCollection services, IConfiguration configuration)
         {
-            var connectionString = configuration.GetConnectionString("DefaultConnection")
-                ?? throw new InvalidOperationException("Chưa cấu hình DefaultConnection!");
+            var connectionString = configuration.GetConnectionString("DefaultConnection");
+
+            // Dùng IsNullOrWhiteSpace chứ KHÔNG dùng toán tử "?? throw".
+            // Lý do: GetConnectionString trả về CHUỖI RỖNG (không phải null) khi khoá có
+            // tồn tại trong appsettings.json nhưng để giá trị "". Toán tử ?? chỉ bắt null,
+            // nên app sẽ khởi động bình thường rồi mới chết ở truy vấn đầu tiên — tức là
+            // lỗi cấu hình bị phát hiện MUỘN, lúc người dùng đã gọi API.
+            // Fail-fast: sai cấu hình thì không cho khởi động luôn.
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                throw new InvalidOperationException(
+                    "Chưa cấu hình chuỗi kết nối database. " +
+                    "Ở môi trường Development: đặt trong appsettings.Development.json. " +
+                    "Khi deploy: đặt biến môi trường ConnectionStrings__DefaultConnection.");
+            }
 
             services.AddDbContext<AppDbContext>(options =>
                 options.UseNpgsql(connectionString, npgsqlOptions =>
