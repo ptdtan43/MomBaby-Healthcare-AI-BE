@@ -18,6 +18,11 @@ namespace MomOi.API.DTOs.Auth
         public string Email { get; set; } = string.Empty;
 
         /// <summary>
+        /// Full name entered at registration (shown in greetings instead of the email).
+        /// </summary>
+        public string FullName { get; set; } = string.Empty;
+
+        /// <summary>
         /// Current subscription tier.
         /// </summary>
         public SubscriptionTier Tier { get; set; }

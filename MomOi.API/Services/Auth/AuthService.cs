@@ -91,6 +91,7 @@ namespace MomOi.API.Services.Auth
                 {
                     Id = user.Id,
                     Email = user.Email!,
+                    FullName = user.FullName,
                     Tier = user.EffectiveTier,
                     TierExpiresAt = user.TierExpiresAt,
                     Roles = roles
@@ -127,6 +128,7 @@ namespace MomOi.API.Services.Auth
                 {
                     Id = user.Id,
                     Email = user.Email!,
+                    FullName = user.FullName,
                     Tier = user.EffectiveTier,
                     TierExpiresAt = user.TierExpiresAt,
                     Roles = roles
@@ -174,6 +176,7 @@ namespace MomOi.API.Services.Auth
                 {
                     Id = user.Id,
                     Email = user.Email!,
+                    FullName = user.FullName,
                     Tier = user.EffectiveTier,
                     TierExpiresAt = user.TierExpiresAt,
                     Roles = roles
