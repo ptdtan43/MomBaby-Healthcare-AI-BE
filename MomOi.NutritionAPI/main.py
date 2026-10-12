@@ -18,6 +18,7 @@ from schemas import (
 from services.usda_service import fetch_usda_nutrients, bulk_ingest_ingredients
 from services.who_nutrition_goals import get_daily_goals
 from services.recommendation_engine import recommend_daily_menu, recommend_weekly_menu, to_recipe_response
+from services.allergen_mapping import normalize_allergies
 
 app = FastAPI(
     title="Mom Ơi! Nutrition API",
@@ -398,12 +399,7 @@ async def get_recipes(
     recipes = query.all()
     
     if allergen_exclude:
-        excludes = [a.strip().lower() for a in allergen_exclude.split(",") if a.strip()]
-        filtered = []
-        for r in recipes:
-            r_allergens = [al.lower() for al in (r.allergens or [])]
-            if not any(e in r_allergens for e in excludes):
-                filtered.append(r)
-        recipes = filtered
+        excludes = normalize_allergies(allergen_exclude.split(","))
+        recipes = [r for r in recipes if not (normalize_allergies(r.allergens) & excludes)]
 
     return [to_recipe_response(r) for r in recipes]

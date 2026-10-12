@@ -96,15 +96,13 @@ namespace MomOi.API.Services.Postpartum
             {
                 var evaluation = _businessRuleEngine.EvaluateEpdsScore(answers);
 
+                // Self-harm disclosures get only the fixed, reviewed safety message: the tone of
+                // generated text cannot be guaranteed and must not follow a crisis message.
                 string aiMessage = evaluation.Recommendation;
-                if (evaluation.IsUrgent)
+                if (evaluation.IsUrgent && !EpdsAssessment.HasSelfHarmThoughts(answers))
                 {
                     var profileDesc = $"Mom ID: {userId}, DeliveryDate: {profile.DeliveryDate:yyyy-MM-dd}";
                     aiMessage = await _geminiService.GenerateEpdsResponseAsync(evaluation.TotalScore, profileDesc);
-                    if (EpdsAssessment.HasSelfHarmThoughts(answers))
-                    {
-                        aiMessage = $"{evaluation.Recommendation}\n\n{aiMessage}";
-                    }
                 }
 
                 var epds = new EpdsAssessment

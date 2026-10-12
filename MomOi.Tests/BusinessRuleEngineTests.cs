@@ -312,6 +312,38 @@ namespace MomOi.Tests
         }
 
         [Fact]
+        public async Task EvaluateAsync_BR05_SelfHarmAnswer_UsesFixedSafetyMessageNotGemini()
+        {
+            var options = CreateInMemoryOptions();
+            using var context = new AppDbContext(options);
+            var (mockGemini, mockHub) = CreateServiceMocks();
+            mockGemini.Setup(g => g.GenerateEpdsResponseAsync(It.IsAny<int>(), It.IsAny<string>()))
+                .ReturnsAsync("Tim em vui lắm, ánh nắng rực rỡ!");
+
+            var engine = new BusinessRuleEngine(context, mockGemini.Object, mockHub.Object);
+            var profile = new MomHealthProfile { UserId = "user-12", Stage = JourneyStage.Postpartum, DeliveryDate = DateTime.UtcNow.AddDays(-10) };
+            context.MomHealthProfiles.Add(profile);
+            await context.SaveChangesAsync();
+
+            // Total 1/30, but question 10 (self-harm thoughts) = "Hầu như không bao giờ".
+            context.EpdsAssessments.Add(new EpdsAssessment
+            {
+                ProfileId = profile.Id,
+                Answers = new[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 },
+                TakenAt = DateTime.UtcNow
+            });
+            await context.SaveChangesAsync();
+
+            var alerts = await engine.EvaluateAsync(profile);
+
+            var alert = Assert.Single(alerts, a => a.RuleId == "BR05");
+            Assert.Equal(AlertSeverity.Critical, alert.Severity);
+            Assert.Contains("115", alert.MessageVi);
+            Assert.DoesNotContain("vui lắm", alert.MessageVi);
+            mockGemini.Verify(g => g.GenerateEpdsResponseAsync(It.IsAny<int>(), It.IsAny<string>()), Times.Never);
+        }
+
+        [Fact]
         public async Task EvaluateBabyAsync_BR06_WeaningTimeline_TriggersAlert()
         {
             // Arrange
