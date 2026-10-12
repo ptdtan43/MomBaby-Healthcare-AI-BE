@@ -4,6 +4,7 @@ using MomOi.API.Repositories;
 using System;
 using System.Linq;
 using System.Text.Json;
+using MomOi.API.Constants;
 using System.Threading.Tasks;
 
 namespace MomOi.API.Services.Dashboard
@@ -20,7 +21,7 @@ namespace MomOi.API.Services.Dashboard
         public async Task<ApiResponse<object>> GetUserDashboardAsync(string userId)
         {
             var now = DateTime.UtcNow;
-            var todayDate = now.Date;
+            var todayDate = VietnamTime.Today;
 
             // 1. User Profile for BMI
             var profile = await _unitOfWork.Repository<MomHealthProfile>()
@@ -95,7 +96,7 @@ namespace MomOi.API.Services.Dashboard
             var dietPlanEntry = allDietPlans.OrderByDescending(d => d.CreatedAt).FirstOrDefault();
 
             object todayMeals = Array.Empty<object>();
-            string todayName = now.DayOfWeek.ToString();
+            string todayName = todayDate.DayOfWeek.ToString();
 
             if (dietPlanEntry != null && !string.IsNullOrEmpty(dietPlanEntry.DailyMealsJson))
             {

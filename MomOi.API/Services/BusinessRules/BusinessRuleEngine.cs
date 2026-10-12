@@ -9,6 +9,7 @@ using MomOi.API.Services.AI;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using MomOi.API.Constants;
 using System.Threading.Tasks;
 
 namespace MomOi.API.Services.BusinessRules
@@ -86,10 +87,15 @@ namespace MomOi.API.Services.BusinessRules
             var result = new EpdsEvaluationResult
             {
                 TotalScore = score,
-                IsUrgent = score >= 13
+                IsUrgent = EpdsAssessment.IndicatesUrgency(answers)
             };
 
-            if (score >= 13)
+            if (EpdsAssessment.HasSelfHarmThoughts(answers))
+            {
+                result.RiskLevel = "High";
+                result.Recommendation = "Mami đã chia sẻ rằng có lúc xuất hiện ý nghĩ làm hại bản thân. Mami không đơn độc — hãy nói ngay với người thân và liên hệ bác sĩ hoặc chuyên gia tâm lý. Nếu cảm thấy không an toàn, hãy gọi Cấp cứu 115 hoặc đến cơ sở y tế gần nhất.";
+            }
+            else if (score >= 13)
             {
                 result.RiskLevel = "High";
                 result.Recommendation = "Bạn có nguy cơ trầm cảm sau sinh rất cao. Vui lòng liên hệ với chuyên gia tâm lý hoặc bác sĩ chuyên khoa ngay lập tức để được tư vấn và hỗ trợ.";
@@ -190,7 +196,9 @@ namespace MomOi.API.Services.BusinessRules
         public async Task<List<HealthAlert>> EvaluateAsync(MomHealthProfile profile)
         {
             var alerts = new List<HealthAlert>();
-            var today = DateTime.UtcNow.Date;
+            var today = VietnamTime.Today;
+            var todayStartUtc = VietnamTime.TodayStartUtc;
+            var tomorrowStartUtc = todayStartUtc.AddDays(1);
 
             // ── BR01 — Fertility Window Alert ──────────────────────────────────
             if (profile.Stage == JourneyStage.PrePregnancy && profile.LastPeriodDate.HasValue)
@@ -219,7 +227,7 @@ namespace MomOi.API.Services.BusinessRules
             if (profile.Stage == JourneyStage.Pregnant && _context != null)
             {
                 var todayMeals = await _context.MealLogs
-                    .Where(m => m.UserId == profile.UserId && m.LoggedAt.Date == today)
+                    .Where(m => m.UserId == profile.UserId && m.LoggedAt >= todayStartUtc && m.LoggedAt < tomorrowStartUtc)
                     .ToListAsync();
 
                 var dangerousKeywords = new[] { "sushi", "tái", "gỏi", "rượu", "trà đặc", "dứa", "ổi xanh", "gan sống" };
@@ -263,18 +271,18 @@ namespace MomOi.API.Services.BusinessRules
             if (profile.Stage == JourneyStage.Pregnant && profile.PregnancyWeek.HasValue && profile.PregnancyWeek <= 36 && _context != null)
             {
                 var todaySteps = await _context.ExerciseLogs
-                    .Where(e => e.UserId == profile.UserId && e.RecordedAt.Date == today)
+                    .Where(e => e.UserId == profile.UserId && e.RecordedAt >= todayStartUtc && e.RecordedAt < tomorrowStartUtc)
                     .SumAsync(e => e.StepCount);
 
                 var lastExerciseLog = await _context.ExerciseLogs
-                    .Where(e => e.UserId == profile.UserId && e.RecordedAt.Date < today && (e.StepCount > 0 || e.DurationMinutes > 0))
+                    .Where(e => e.UserId == profile.UserId && e.RecordedAt < todayStartUtc && (e.StepCount > 0 || e.DurationMinutes > 0))
                     .OrderByDescending(e => e.RecordedAt)
                     .FirstOrDefaultAsync();
 
                 int daysSinceLastExercise = 99;
                 if (lastExerciseLog != null)
                 {
-                    daysSinceLastExercise = (today - lastExerciseLog.RecordedAt.Date).Days;
+                    daysSinceLastExercise = (today - VietnamTime.LocalDate(lastExerciseLog.RecordedAt)).Days;
                 }
 
                 if (todaySteps < 3000 && daysSinceLastExercise > 2)
@@ -350,10 +358,10 @@ namespace MomOi.API.Services.BusinessRules
                     .OrderByDescending(e => e.TakenAt)
                     .FirstOrDefaultAsync();
 
-                if (latestEpds != null && latestEpds.Answers.Sum() >= 9)
+                if (latestEpds != null && (latestEpds.Answers.Sum() >= 9 || latestEpds.IsUrgent))
                 {
                     int totalScore = latestEpds.Answers.Sum();
-                    bool isCritical = totalScore >= 13;
+                    bool isCritical = latestEpds.IsUrgent;
                     string empatheticMessage = "Mami ơi, mami không đơn độc đâu nhé. Hãy chia sẻ cùng những người xung quanh mami nha 💙.";
                     if (_geminiService != null)
                     {
@@ -366,7 +374,7 @@ namespace MomOi.API.Services.BusinessRules
                         Severity: isCritical ? AlertSeverity.Critical : AlertSeverity.Warning,
                         TitleVi: isCritical ? "Bạn có thể đang cần hỗ trợ tâm lý 💙" : "Dấu hiệu trầm cảm nhẹ (EPDS) 💙",
                         MessageVi: $"Điểm EPDS: {totalScore}/30. {empatheticMessage}",
-                        SuggestionVi: "Đường dây nóng hỗ trợ tâm lý sản phụ: 1900xxxx. Chúng tôi khuyên mami nên gặp bác sĩ sản khoa hoặc chuyên gia tâm lý.",
+                        SuggestionVi: "Chúng tôi khuyên mami nên gặp bác sĩ sản khoa hoặc chuyên gia tâm lý. Nếu cảm thấy không an toàn, hãy gọi Cấp cứu 115.",
                         TriggeredAt: DateTime.UtcNow
                     );
                     alerts.Add(alert);

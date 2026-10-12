@@ -5,6 +5,7 @@ using MomOi.API.Services.BusinessRules;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using MomOi.API.Constants;
 using System.Threading.Tasks;
 
 namespace MomOi.API.Services.Fertility
@@ -144,7 +145,7 @@ namespace MomOi.API.Services.Fertility
             var alerts = await _ruleEngine.EvaluateAsync(profile);
             var br01Alert = alerts.FirstOrDefault(a => a.RuleId == "BR01");
 
-            var today = DateTime.UtcNow.Date;
+            var today = VietnamTime.Today;
             var cycleLength = profile.AvgCycleLength ?? 28;
             var lastPeriod = profile.LastPeriodDate.Value.Date;
 

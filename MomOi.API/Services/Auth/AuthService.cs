@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace MomOi.API.Services.Auth
@@ -74,13 +75,8 @@ namespace MomOi.API.Services.Auth
             await _unitOfWork.Repository<MomHealthProfile>().AddAsync(healthProfile);
             await _unitOfWork.SaveChangesAsync();
 
-            // Generate JWT and Refresh token
             var token = await GenerateJwtTokenAsync(user);
-            var refreshToken = GenerateRefreshToken();
-
-            user.RefreshToken = refreshToken;
-            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(30);
-            await _userManager.UpdateAsync(user);
+            var refreshToken = await IssueRefreshTokenAsync(user.Id);
 
             var roles = await _userManager.GetRolesAsync(user);
             return new AuthResponseDto
@@ -112,11 +108,7 @@ namespace MomOi.API.Services.Auth
             }
 
             var token = await GenerateJwtTokenAsync(user);
-            var refreshToken = GenerateRefreshToken();
-
-            user.RefreshToken = refreshToken;
-            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(30);
-            await _userManager.UpdateAsync(user);
+            var refreshToken = await IssueRefreshTokenAsync(user.Id);
 
             var roles = await _userManager.GetRolesAsync(user);
             return new AuthResponseDto
@@ -136,19 +128,17 @@ namespace MomOi.API.Services.Auth
 
         public async Task<AuthResponseDto> RefreshTokenAsync(RefreshTokenDto dto)
         {
-            var principal = GetPrincipalFromExpiredToken(dto.RefreshToken);
-            // If the principal is null or has no claims, we can locate user directly by scanning DB for the refresh token
-            // This is safer if token parsing fails when token is completely expired
-            var user = await _userManager.FindByNameAsync(principal?.Identity?.Name ?? string.Empty);
-            
-            if (user == null)
+            var tokens = _unitOfWork.Repository<UserRefreshToken>();
+            var hash = HashToken(dto.RefreshToken);
+            var stored = await tokens.FirstOrDefaultAsync(t => t.TokenHash == hash);
+
+            if (stored == null || stored.ExpiresAt <= DateTime.UtcNow)
             {
-                // Fallback: look up user by the refresh token itself
-                user = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync(
-                    _userManager.Users, u => u.RefreshToken == dto.RefreshToken);
+                throw new UnauthorizedAccessException("Refresh Token không hợp lệ hoặc đã hết hạn.");
             }
 
-            if (user == null || user.RefreshToken != dto.RefreshToken || user.RefreshTokenExpiryTime <= DateTime.UtcNow)
+            var user = await _userManager.FindByIdAsync(stored.UserId);
+            if (user == null)
             {
                 throw new UnauthorizedAccessException("Refresh Token không hợp lệ hoặc đã hết hạn.");
             }
@@ -158,12 +148,11 @@ namespace MomOi.API.Services.Auth
                 throw new UnauthorizedAccessException("Tài khoản của bạn đã bị khóa bởi Quản trị viên.");
             }
 
-            var newToken = await GenerateJwtTokenAsync(user);
-            var newRefreshToken = GenerateRefreshToken();
+            // Rotation: the presented token is single-use; only this device's row is replaced.
+            tokens.Remove(stored);
 
-            user.RefreshToken = newRefreshToken;
-            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(30);
-            await _userManager.UpdateAsync(user);
+            var newToken = await GenerateJwtTokenAsync(user);
+            var newRefreshToken = await IssueRefreshTokenAsync(user.Id);
 
             var roles = await _userManager.GetRolesAsync(user);
             return new AuthResponseDto
@@ -181,16 +170,46 @@ namespace MomOi.API.Services.Auth
             };
         }
 
-        public async Task LogoutAsync(string userId)
+        public async Task LogoutAsync(string userId, string? refreshToken)
         {
-            var user = await _userManager.FindByIdAsync(userId);
-            if (user != null)
+            var tokens = _unitOfWork.Repository<UserRefreshToken>();
+
+            if (!string.IsNullOrWhiteSpace(refreshToken))
             {
-                user.RefreshToken = null;
-                user.RefreshTokenExpiryTime = null;
-                await _userManager.UpdateAsync(user);
+                var hash = HashToken(refreshToken);
+                var current = await tokens.FirstOrDefaultAsync(t => t.UserId == userId && t.TokenHash == hash);
+                if (current != null) tokens.Remove(current);
             }
+            else
+            {
+                // Legacy clients send no token: revoke every device, as before.
+                tokens.RemoveRange(await tokens.FindAsync(t => t.UserId == userId));
+            }
+
+            await _unitOfWork.SaveChangesAsync();
         }
+
+        private async Task<string> IssueRefreshTokenAsync(string userId)
+        {
+            var tokens = _unitOfWork.Repository<UserRefreshToken>();
+            var now = DateTime.UtcNow;
+
+            tokens.RemoveRange(await tokens.FindAsync(t => t.UserId == userId && t.ExpiresAt <= now));
+
+            var refreshToken = GenerateRefreshToken();
+            await tokens.AddAsync(new UserRefreshToken
+            {
+                UserId = userId,
+                TokenHash = HashToken(refreshToken),
+                ExpiresAt = now.AddDays(30)
+            });
+            await _unitOfWork.SaveChangesAsync();
+
+            return refreshToken;
+        }
+
+        private static string HashToken(string token) =>
+            Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 
         private async Task<string> GenerateJwtTokenAsync(AppUser user)
         {
@@ -233,23 +252,6 @@ namespace MomOi.API.Services.Auth
             using var rng = RandomNumberGenerator.Create();
             rng.GetBytes(randomNumber);
             return Convert.ToBase64String(randomNumber);
-        }
-
-        private ClaimsPrincipal? GetPrincipalFromExpiredToken(string token)
-        {
-            // We just need to read the claims to find out who the user is.
-            // Since the refresh token is verified cryptographically in DB,
-            // we can read claims from the JWT (even if expired).
-            try
-            {
-                var tokenHandler = new JwtSecurityTokenHandler();
-                var jwtToken = tokenHandler.ReadJwtToken(token);
-                return new ClaimsPrincipal(new ClaimsIdentity(jwtToken.Claims, "jwt"));
-            }
-            catch
-            {
-                return null;
-            }
         }
     }
 }

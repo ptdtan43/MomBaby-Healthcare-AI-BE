@@ -4,7 +4,6 @@ using MomOi.API.DTOs;
 using MomOi.API.Models.Identity;
 using System;
 using System.Security.Claims;
-using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace MomOi.API.Middleware
@@ -79,9 +78,9 @@ namespace MomOi.API.Middleware
         private static Task DenyAsync(HttpContext context, int statusCode, string message)
         {
             context.Response.StatusCode = statusCode;
-            context.Response.ContentType = "application/json";
             var error = ApiResponse<object>.FailureResult(message);
-            return context.Response.WriteAsync(JsonSerializer.Serialize(error));
+            // WriteAsJsonAsync uses the web defaults (camelCase), matching every other endpoint.
+            return context.Response.WriteAsJsonAsync(error);
         }
     }
 }

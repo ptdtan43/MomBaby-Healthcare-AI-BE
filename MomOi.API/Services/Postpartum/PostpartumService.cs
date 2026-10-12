@@ -6,6 +6,7 @@ using MomOi.API.Services.BusinessRules;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using MomOi.API.Constants;
 using System.Threading.Tasks;
 
 namespace MomOi.API.Services.Postpartum
@@ -53,7 +54,7 @@ namespace MomOi.API.Services.Postpartum
 
             await _unitOfWork.SaveChangesAsync();
 
-            var daysPostpartum = (DateTime.UtcNow.Date - deliveryDate.Date).Days;
+            var daysPostpartum = (VietnamTime.Today - deliveryDate.Date).Days;
             if (daysPostpartum < 0) daysPostpartum = 0;
 
             string phase = "Giai đoạn hồi phục cấp tính (Tuần 1)";
@@ -100,6 +101,10 @@ namespace MomOi.API.Services.Postpartum
                 {
                     var profileDesc = $"Mom ID: {userId}, DeliveryDate: {profile.DeliveryDate:yyyy-MM-dd}";
                     aiMessage = await _geminiService.GenerateEpdsResponseAsync(evaluation.TotalScore, profileDesc);
+                    if (EpdsAssessment.HasSelfHarmThoughts(answers))
+                    {
+                        aiMessage = $"{evaluation.Recommendation}\n\n{aiMessage}";
+                    }
                 }
 
                 var epds = new EpdsAssessment
@@ -120,7 +125,7 @@ namespace MomOi.API.Services.Postpartum
 
                 var resources = new List<string>
                 {
-                    "Đường dây nóng hỗ trợ tâm lý sản phụ: 1900xxxx",
+                    "Cấp cứu y tế (24/7): 115",
                     "Chương trình đồng hành sức khỏe tinh thần MomOi",
                     "Bác sĩ chuyên khoa tâm lý Bệnh viện Phụ sản"
                 };

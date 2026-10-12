@@ -8,6 +8,7 @@ using MomOi.API.Services.Nutrition;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using MomOi.API.Constants;
 using System.Threading.Tasks;
 
 namespace MomOi.API.Services.Pregnancy
@@ -271,7 +272,7 @@ namespace MomOi.API.Services.Pregnancy
                 return null;
             }
 
-            var daysElapsed = (DateTime.UtcNow.Date - profile.LastPeriodDate.Value.Date).Days;
+            var daysElapsed = (VietnamTime.Today - profile.LastPeriodDate.Value.Date).Days;
             var week = (daysElapsed / 7) + 1;
             if (week < 1) week = 1;
             if (week > 42) week = 42;
@@ -314,8 +315,8 @@ namespace MomOi.API.Services.Pregnancy
 
         public async Task<ApiResponse<object>> GetTodayStepsAsync(string userId)
         {
-            var today = DateTime.UtcNow.Date;
-            var logs = await _unitOfWork.Repository<ExerciseLog>().FindAsync(e => e.UserId == userId && e.RecordedAt >= today);
+            var todayStartUtc = VietnamTime.TodayStartUtc;
+            var logs = await _unitOfWork.Repository<ExerciseLog>().FindAsync(e => e.UserId == userId && e.RecordedAt >= todayStartUtc);
             int totalSteps = logs.Sum(e => e.StepCount);
             return ApiResponse<object>.SuccessResult(new { todaySteps = totalSteps });
         }

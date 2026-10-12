@@ -10,6 +10,7 @@ namespace MomOi.API.Models.Health
     public class MedicationSchedule : SoftDeletableEntity
     {
         public string UserId { get; set; } = string.Empty;
+        [System.Text.Json.Serialization.JsonIgnore]
         public AppUser User { get; set; } = null!;
 
         /// <summary>Name of the medication (e.g. "Axit Folic 400mcg").</summary>
@@ -43,7 +44,9 @@ namespace MomOi.API.Models.Health
         /// <summary>Taken or Skipped</summary>
         public AdherenceStatus Status { get; set; } = AdherenceStatus.Taken;
 
-        // Navigation property
+        // Back-reference: EF relationship fix-up populates it when logs and schedules
+        // share a DbContext, which would make Schedule -> AdherenceLogs -> Schedule a cycle.
+        [System.Text.Json.Serialization.JsonIgnore]
         public MedicationSchedule Schedule { get; set; } = null!;
     }
 }

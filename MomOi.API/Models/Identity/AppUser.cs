@@ -51,16 +51,6 @@ namespace MomOi.API.Models.Identity
                 : Tier;
 
         /// <summary>
-        /// Active refresh token for generating new access tokens.
-        /// </summary>
-        public string? RefreshToken { get; set; }
-
-        /// <summary>
-        /// Expiry time of the refresh token.
-        /// </summary>
-        public DateTime? RefreshTokenExpiryTime { get; set; }
-
-        /// <summary>
         /// Navigation property to the health profile stored in a separate table.
         /// </summary>
         public MomHealthProfile? HealthProfile { get; set; }

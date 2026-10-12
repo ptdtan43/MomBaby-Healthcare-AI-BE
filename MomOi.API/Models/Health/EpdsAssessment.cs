@@ -28,10 +28,18 @@ namespace MomOi.API.Models.Health
         /// </summary>
         public int TotalScore => Answers.Sum();
 
+        public bool IsUrgent => IndicatesUrgency(Answers);
+
         /// <summary>
-        /// If score >= 13, critical depression risk is indicated.
+        /// Urgent when total >= 13, or when question 10 (self-harm thoughts) is anything
+        /// other than "Never" (score 0) — the EPDS guideline requires immediate follow-up
+        /// for item 10 regardless of the total.
         /// </summary>
-        public bool IsUrgent => TotalScore >= 13;
+        public static bool IndicatesUrgency(int[] answers) =>
+            answers.Sum() >= 13 || (answers.Length >= 10 && answers[9] > 0);
+
+        public static bool HasSelfHarmThoughts(int[] answers) =>
+            answers.Length >= 10 && answers[9] > 0;
 
         /// <summary>
         /// Timestamp when the test was taken.

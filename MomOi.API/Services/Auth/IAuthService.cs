@@ -24,8 +24,8 @@ namespace MomOi.API.Services.Auth
         Task<AuthResponseDto> RefreshTokenAsync(RefreshTokenDto dto);
 
         /// <summary>
-        /// Revokes the user's active refresh token, logging them out.
+        /// Revokes the given device's refresh token, or every device's when none is given.
         /// </summary>
-        Task LogoutAsync(string userId);
+        Task LogoutAsync(string userId, string? refreshToken);
     }
 }

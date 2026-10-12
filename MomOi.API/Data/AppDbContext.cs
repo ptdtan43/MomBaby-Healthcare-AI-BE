@@ -69,6 +69,8 @@ namespace MomOi.API.Data
         public DbSet<PaymentTransaction> PaymentTransactions { get; set; } = null!;
         public DbSet<VaccinationRecord> VaccinationRecords { get; set; } = null!;
 
+        public DbSet<UserRefreshToken> UserRefreshTokens { get; set; } = null!;
+
         public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
             // ── Bước 1: chuyển lệnh XOÁ thành lệnh CẬP NHẬT cờ, với entity có xoá mềm.
@@ -121,6 +123,16 @@ namespace MomOi.API.Data
                 .WithOne(u => u.HealthProfile)
                 .HasForeignKey<MomHealthProfile>(m => m.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<UserRefreshToken>(e =>
+            {
+                e.HasOne(t => t.User)
+                    .WithMany()
+                    .HasForeignKey(t => t.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                e.HasIndex(t => t.TokenHash).IsUnique();
+                e.HasIndex(t => t.UserId);
+            });
 
             // Index UserId in health profile, baby profile, logs for performance
             builder.Entity<MomHealthProfile>()

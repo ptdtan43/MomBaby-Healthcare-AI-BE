@@ -5,6 +5,7 @@ using MomOi.API.Services.BusinessRules;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using MomOi.API.Constants;
 using System.Threading.Tasks;
 
 namespace MomOi.API.Services.DailyMonitoring
@@ -24,7 +25,7 @@ namespace MomOi.API.Services.DailyMonitoring
 
         public async Task<ApiResponse<object>> CreateOrUpdateDailyMonitoringAsync(string userId, DailyMonitoringRequestDto request)
         {
-            var today = DateTime.UtcNow.Date;
+            var today = VietnamTime.Today;
             var logDate = request.Date.HasValue ? request.Date.Value.Date : today;
 
             var existing = await _unitOfWork.Repository<DailyMonitoringLog>().FirstOrDefaultAsync(d => d.UserId == userId && d.Date == logDate);
@@ -141,7 +142,7 @@ namespace MomOi.API.Services.DailyMonitoring
 
         public async Task<ApiResponse<object>> GetTodayMonitoringAsync(string userId)
         {
-            var today = DateTime.UtcNow.Date;
+            var today = VietnamTime.Today;
             var entry = await _unitOfWork.Repository<DailyMonitoringLog>().FirstOrDefaultAsync(d => d.UserId == userId && d.Date == today);
 
             return ApiResponse<object>.SuccessResult(new
@@ -161,7 +162,7 @@ namespace MomOi.API.Services.DailyMonitoring
 
         public async Task<ApiResponse<object>> GetInsightsAsync(string userId, int days)
         {
-            var startDate = DateTime.UtcNow.Date.AddDays(-days);
+            var startDate = VietnamTime.Today.AddDays(-days);
             var allLogs = await _unitOfWork.Repository<DailyMonitoringLog>().FindAsync(d => d.UserId == userId && d.Date >= startDate);
             var history = allLogs.OrderByDescending(d => d.Date).ToList();
 

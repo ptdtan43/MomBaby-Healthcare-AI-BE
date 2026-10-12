@@ -5,6 +5,7 @@ using MomOi.API.Repositories;
 using MomOi.API.Services.BusinessRules;
 using System;
 using System.Linq;
+using MomOi.API.Constants;
 using System.Threading.Tasks;
 
 namespace MomOi.API.Services.Lifestyle
@@ -28,7 +29,7 @@ namespace MomOi.API.Services.Lifestyle
             if (!validStress.Contains(request.StressLevel))
                 return ApiResponse<object>.FailureResult("Mức độ căng thẳng phải là: 'Low', 'Moderate', hoặc 'High'.");
 
-            var today = DateTime.UtcNow.Date;
+            var today = VietnamTime.Today;
 
             var existing = await _unitOfWork.Repository<LifestyleEntry>().FirstOrDefaultAsync(e => e.UserId == userId && e.Date == today);
 
@@ -119,7 +120,7 @@ namespace MomOi.API.Services.Lifestyle
 
         public async Task<ApiResponse<object>> GetTodayEntryAsync(string userId)
         {
-            var today = DateTime.UtcNow.Date;
+            var today = VietnamTime.Today;
             var entry = await _unitOfWork.Repository<LifestyleEntry>().FirstOrDefaultAsync(e => e.UserId == userId && e.Date == today);
 
             if (entry == null)
@@ -132,7 +133,7 @@ namespace MomOi.API.Services.Lifestyle
 
         public async Task<ApiResponse<object>> GetHistoryAsync(string userId, int days)
         {
-            var startDate = DateTime.UtcNow.Date.AddDays(-days);
+            var startDate = VietnamTime.Today.AddDays(-days);
             var allEntries = await _unitOfWork.Repository<LifestyleEntry>().FindAsync(e => e.UserId == userId && e.Date >= startDate);
             var history = allEntries.OrderBy(e => e.Date).ToList();
 
@@ -166,7 +167,7 @@ namespace MomOi.API.Services.Lifestyle
             var avgHealthScore = (int)Math.Round(entries.Average(e => e.HealthScore));
 
             int streakCount = 0;
-            var today = DateTime.UtcNow.Date;
+            var today = VietnamTime.Today;
             var yesterday = today.AddDays(-1);
             var latestDate = entries[0].Date;
 

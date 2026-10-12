@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using MomOi.API.DTOs;
+using MomOi.API.DTOs.Mom;
 using MomOi.API.Models.Health;
 using MomOi.API.Models.Identity;
 using MomOi.API.Services.UserProfile;
@@ -44,7 +45,7 @@ namespace MomOi.API.Controllers
         /// </summary>
         [HttpPut]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> UpdateProfile([FromBody] MomHealthProfile updateDto)
+        public async Task<IActionResult> UpdateProfile([FromBody] UpdateMomHealthProfileDto updateDto)
         {
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId)) return Unauthorized();

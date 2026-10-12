@@ -8,6 +8,7 @@ using MomOi.API.Services.Notifications;
 using System;
 using System.Linq;
 using System.Threading;
+using MomOi.API.Constants;
 using System.Threading.Tasks;
 
 namespace MomOi.API.BackgroundServices
@@ -55,7 +56,7 @@ namespace MomOi.API.BackgroundServices
             var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
 
             var users = await dbContext.Users.ToListAsync(stoppingToken);
-            var todayStr = DateTime.UtcNow.Date;
+            var todayStr = VietnamTime.Today;
 
             foreach (var user in users)
             {

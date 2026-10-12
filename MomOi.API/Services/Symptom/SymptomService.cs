@@ -48,11 +48,14 @@ namespace MomOi.API.Services.Symptom
                          $"\"lifestyleConnection\":\"...\",\"urgencyLevel\":\"Thấp|Trung bình|Cao|Khẩn cấp\"," +
                          $"\"urgencyReason\":\"...\",\"recommendations\":[\"...\"],\"dietarySuggestions\":[\"...\"]," +
                          $"\"disclaimer\":\"...\",\"shouldSeeDoctor\":false,\"specialistType\":\"...\"," +
-                         $"\"severityScore\":0}}";
+                         $"\"severityScore\":0}}\n\n" +
+                         $"severityScore là số nguyên trên thang 0–100 (0 = không đáng lo, 100 = nguy hiểm tính mạng), " +
+                         $"phải nhất quán với urgencyLevel: Thấp 0–29, Trung bình 30–59, Cao 60–84, Khẩn cấp 85–100.";
 
             string aiResponseJson = string.Empty;
             int severityScore = 0;
-            UrgencyLevel urgencyLevel = UrgencyLevel.Low;
+            // null = chưa xác định (AI lỗi): không được mặc định "Low" vì sẽ trấn an sai người dùng.
+            UrgencyLevel? urgencyLevel = null;
             bool shouldSeeDoctor = false;
             bool aiSucceeded = false;
 
@@ -83,6 +86,10 @@ namespace MomOi.API.Services.Symptom
                 aiResponseJson = string.Empty;
             }
 
+            // Urgency is the primary signal: the score scale is model-dependent, the urgency label is not.
+            bool isSerious = aiSucceeded &&
+                (urgencyLevel is UrgencyLevel.High or UrgencyLevel.Critical || severityScore >= 70);
+
             var processingMs = (int)(DateTime.UtcNow - startTime).TotalMilliseconds;
 
             var log = new SymptomLog
@@ -97,7 +104,7 @@ namespace MomOi.API.Services.Symptom
                 UrgencyLevel = urgencyLevel,
                 ShouldSeeDoctor = shouldSeeDoctor,
                 SeverityScore = severityScore,
-                AlertFlag = severityScore >= 70,
+                AlertFlag = isSerious,
                 ProcessingTimeMs = processingMs,
                 GeminiModel = "gemini-2.5-flash",
                 CreatedAt = DateTime.UtcNow,
@@ -106,14 +113,17 @@ namespace MomOi.API.Services.Symptom
 
             await _unitOfWork.Repository<SymptomLog>().AddAsync(log);
 
-            if (severityScore >= 70)
+            if (isSerious)
             {
+                var isCritical = urgencyLevel == UrgencyLevel.Critical;
                 await _unitOfWork.Repository<NotificationAlert>().AddAsync(new NotificationAlert
                 {
                     UserId = log.UserId,
                     Type = NotificationAlertType.Symptom,
-                    Severity = AlertSeverity.Medium,
-                    Message = $"Phát hiện triệu chứng nghiêm trọng (điểm {severityScore}/100). Vui lòng liên hệ bác sĩ ngay.",
+                    Severity = isCritical ? AlertSeverity.Critical : AlertSeverity.High,
+                    Message = isCritical
+                        ? "Triệu chứng của mami được đánh giá KHẨN CẤP. Hãy gọi Cấp cứu 115 hoặc đến bệnh viện gần nhất ngay."
+                        : "Phát hiện triệu chứng nghiêm trọng. Vui lòng liên hệ bác sĩ ngay.",
                     Status = NotificationStatus.Pending,
                     Channels = new[] { "email", "app" },
                     CreatedAt = DateTime.UtcNow
@@ -138,9 +148,9 @@ namespace MomOi.API.Services.Symptom
         /// onto the <see cref="UrgencyLevel"/> enum. English values are accepted as well so the
         /// mapping keeps working if the prompt is ever changed.
         /// </summary>
-        private static UrgencyLevel MapUrgencyLevel(string? value)
+        private static UrgencyLevel? MapUrgencyLevel(string? value)
         {
-            if (string.IsNullOrWhiteSpace(value)) return UrgencyLevel.Low;
+            if (string.IsNullOrWhiteSpace(value)) return null;
 
             return value.Trim().ToLowerInvariant() switch
             {
@@ -148,7 +158,7 @@ namespace MomOi.API.Services.Symptom
                 "trung bình" or "medium" => UrgencyLevel.Medium,
                 "cao" or "high" => UrgencyLevel.High,
                 "khẩn cấp" or "critical" => UrgencyLevel.Critical,
-                _ => UrgencyLevel.Low
+                _ => null
             };
         }
 

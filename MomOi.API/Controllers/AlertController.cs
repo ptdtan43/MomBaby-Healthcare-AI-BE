@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using MomOi.API.DTOs;
 using MomOi.API.Models.Health;
+using MomOi.API.Models.Identity;
 using MomOi.API.Services.Alert;
 using System.Security.Claims;
 using System.Threading.Tasks;
@@ -51,6 +52,13 @@ namespace MomOi.API.Controllers
 
             var recipientUserId = !string.IsNullOrWhiteSpace(request.TargetUserId) ? request.TargetUserId : currentUserId;
 
+            var isCareTeam = User.IsInRole(AppRoles.Staff) || User.IsInRole(AppRoles.Expert) || User.IsInRole(AppRoles.Admin);
+            if (recipientUserId != currentUserId && !isCareTeam)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden,
+                    ApiResponse<object>.FailureResult("Bạn không có quyền gửi cảnh báo cho người dùng khác."));
+            }
+
             var response = await _alertService.CreateAlertManualAsync(recipientUserId, request);
             return response.Success ? StatusCode(StatusCodes.Status201Created, response) : BadRequest(response);
         }
@@ -84,14 +92,15 @@ namespace MomOi.API.Controllers
         }
 
         /// <summary>
-        /// Marks alert or user risk logs as resolved.
+        /// Marks every pending risk log of a user as resolved (Staff dashboard "đã hỗ trợ").
         /// </summary>
-        [HttpPatch("{id}/resolve")]
-        [HttpPost("{id}/resolve")]
+        [Authorize(Roles = AppRoles.Admin + "," + AppRoles.Staff)]
+        [HttpPatch("{userId}/resolve")]
+        [HttpPost("{userId}/resolve")]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> ResolveAlert(string id)
+        public async Task<IActionResult> ResolveAlert(string userId)
         {
-            var response = await _alertService.ResolveAlertAsync(id);
+            var response = await _alertService.ResolveAlertAsync(userId);
             return response.Success ? Ok(response) : NotFound(response);
         }
     }
