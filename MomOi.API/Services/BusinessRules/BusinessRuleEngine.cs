@@ -363,7 +363,11 @@ namespace MomOi.API.Services.BusinessRules
                     int totalScore = latestEpds.Answers.Sum();
                     bool isCritical = latestEpds.IsUrgent;
                     string empatheticMessage = "Mami ơi, mami không đơn độc đâu nhé. Hãy chia sẻ cùng những người xung quanh mami nha 💙.";
-                    if (_geminiService != null)
+                    if (EpdsAssessment.HasSelfHarmThoughts(latestEpds.Answers))
+                    {
+                        empatheticMessage = EvaluateEpdsScore(latestEpds.Answers).Recommendation;
+                    }
+                    else if (_geminiService != null)
                     {
                         var profileDesc = $"Mom ID: {profile.UserId}, DeliveryDate: {profile.DeliveryDate:yyyy-MM-dd}";
                         empatheticMessage = await _geminiService.GenerateEpdsResponseAsync(totalScore, profileDesc);

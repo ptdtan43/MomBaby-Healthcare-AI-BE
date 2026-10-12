@@ -50,10 +50,14 @@ namespace MomOi.API.Services.AI
 
             try
             {
-                var prompt = $"Hãy đóng vai một chuyên gia tư vấn tâm lý sản khoa vô cùng ấm áp, thấu cảm. " +
-                             $"Viết một lời phản hồi động viên bằng tiếng Việt (không dùng từ ngữ y khoa chuyên môn lạnh lùng, dùng từ ngữ ấm áp, gần gũi, có biểu tượng cảm xúc như 💙) " +
+                var prompt = $"Hãy đóng vai một chuyên gia tư vấn tâm lý sản khoa ấm áp, thấu cảm. " +
+                             $"Viết một lời phản hồi bằng tiếng Việt, xưng hô là người tư vấn nói với mẹ (gọi mẹ là \"mami\"), " +
                              $"cho người mẹ vừa làm bài kiểm tra trầm cảm sau sinh EPDS với tổng điểm là {epdsScore}/30. " +
-                             $"Thông tin thêm về hồ sơ của mẹ: {userProfile}. Hãy viết ngắn gọn dưới 150 từ.";
+                             $"Điểm này cho thấy mẹ đang có thể gặp khó khăn về tâm lý, nên giọng văn phải dịu dàng và nghiêm túc: " +
+                             $"KHÔNG vui tươi, hớn hở hay lạc quan quá mức, KHÔNG nói rằng mọi thứ đều ổn, KHÔNG phủ nhận cảm xúc của mẹ. " +
+                             $"Ghi nhận cảm xúc của mẹ, nhắc mẹ không đơn độc, khuyến khích mẹ chia sẻ với người thân và gặp bác sĩ hoặc chuyên gia tâm lý. " +
+                             $"Không dùng thuật ngữ y khoa lạnh lùng; có thể dùng một biểu tượng 💙. " +
+                             $"Thông tin thêm về hồ sơ của mẹ: {userProfile}. Hãy viết ngắn gọn dưới 120 từ.";
 
                 return await CallGeminiTextApiAsync(prompt);
             }

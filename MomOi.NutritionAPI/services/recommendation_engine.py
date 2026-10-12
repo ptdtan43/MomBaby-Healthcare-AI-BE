@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from models.baby_profile import BabyProfile
 from models.recipe import Recipe
 from services.who_nutrition_goals import get_daily_goals
+from services.allergen_mapping import normalize_allergies
 from schemas import DailyMenu, WeeklyMenu, RecipeResponse, IngredientResponse, RecipeIngredientResponse
 
 TEXTURE_MAP = {
@@ -73,13 +74,14 @@ def recommend_daily_menu(
         Recipe.max_age_months >= age
     ).all()
 
-    # 2. Filter out allergens case-insensitively
-    baby_allergies = [a.lower() for a in (baby.allergies or [])]
-    safe_recipes = []
-    for r in all_recipes:
-        r_allergens = [a.lower() for a in (r.allergens or [])]
-        if not any(a in r_allergens for a in baby_allergies):
-            safe_recipes.append(r)
+    # 2. Filter out allergens. Both sides go through the same mapping so a Vietnamese
+    # allergy name ("Hải sản") matches the recipe codes ("fish", "shellfish").
+    baby_allergies = normalize_allergies(baby.allergies)
+
+    def is_safe(recipe: Recipe) -> bool:
+        return not (normalize_allergies(recipe.allergens) & baby_allergies)
+
+    safe_recipes = [r for r in all_recipes if is_safe(r)]
 
     # 3. Group by meal_type
     buckets = {
@@ -107,10 +109,9 @@ def recommend_daily_menu(
 
         if not slot_candidates:
             # Absolute fallback: if no recipes in slot at all, fetch any safe recipe in database
+            # Never fall back to recipes containing an allergen: an empty slot is safer.
             fallback_recipes = db.query(Recipe).filter(Recipe.meal_type == slot).all()
-            slot_candidates = [r for r in fallback_recipes if not any(a.lower() in [al.lower() for al in (r.allergens or [])] for a in baby_allergies)]
-            if not slot_candidates:
-                slot_candidates = fallback_recipes
+            slot_candidates = [r for r in fallback_recipes if is_safe(r)]
 
         # Variety check: filter out seen IDs
         unseen_candidates = [c for c in slot_candidates if c.id not in seen_ids.get(slot, set())]
