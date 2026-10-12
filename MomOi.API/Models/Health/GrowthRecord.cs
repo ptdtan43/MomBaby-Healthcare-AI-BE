@@ -5,7 +5,7 @@ namespace MomOi.API.Models.Health
     /// <summary>
     /// Represents a historical growth log (weight/height checkpoint) for a baby.
     /// </summary>
-    public class GrowthRecord : BaseEntity
+    public class GrowthRecord : SoftDeletableEntity
     {
         /// <summary>
         /// Foreign key to BabyProfile.

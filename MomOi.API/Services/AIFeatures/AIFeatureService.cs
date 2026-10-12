@@ -16,19 +16,16 @@ namespace MomOi.API.Services.AIFeatures
     public class AIFeatureService : IAIFeatureService
     {
         private readonly IGeminiService _geminiService;
-        private readonly IGenericRepository<RecipeEntity> _recipeRepo;
-        private readonly IGenericRepository<MomHealthProfile> _profileRepo;
+        private readonly IUnitOfWork _unitOfWork;
         private readonly ILogger<AIFeatureService> _logger;
 
         public AIFeatureService(
             IGeminiService geminiService,
-            IGenericRepository<RecipeEntity> recipeRepo,
-            IGenericRepository<MomHealthProfile> profileRepo,
+            IUnitOfWork unitOfWork,
             ILogger<AIFeatureService> logger)
         {
             _geminiService = geminiService;
-            _recipeRepo = recipeRepo;
-            _profileRepo = profileRepo;
+            _unitOfWork = unitOfWork;
             _logger = logger;
         }
 
@@ -72,9 +69,12 @@ namespace MomOi.API.Services.AIFeatures
 
             // Persist every generated recipe as PendingReview so the Expert portal picks it up
             // (recipe review workflow: AI generates -> PendingReview -> Expert approves/rejects).
-            var profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId);
+            // Chỉ đọc Stage để gắn nhãn, không sửa profile => bỏ change tracking cho nhẹ.
+            var profile = await _unitOfWork.Repository<MomHealthProfile>()
+                .FirstOrDefaultAsync(p => p.UserId == userId, asNoTracking: true);
             var profileStage = profile?.Stage.ToString() ?? "unknown";
 
+            var recipeRepo = _unitOfWork.Repository<RecipeEntity>();
             var savedCount = 0;
             foreach (var item in recipesArray.EnumerateArray())
             {
@@ -127,7 +127,7 @@ namespace MomOi.API.Services.AIFeatures
                     };
                 }
 
-                await _recipeRepo.AddAsync(new RecipeEntity
+                await recipeRepo.AddAsync(new RecipeEntity
                 {
                     UserId = userId,
                     ProfileStage = profileStage,
@@ -149,9 +149,10 @@ namespace MomOi.API.Services.AIFeatures
                 savedCount++;
             }
 
+            // Một lần commit duy nhất cho cả lô công thức: hoặc lưu được hết, hoặc không cái nào.
             if (savedCount > 0)
             {
-                await _recipeRepo.SaveChangesAsync();
+                await _unitOfWork.SaveChangesAsync();
             }
 
             return ApiResponse<object>.SuccessResult(

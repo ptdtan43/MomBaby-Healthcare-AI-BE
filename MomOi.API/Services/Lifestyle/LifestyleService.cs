@@ -5,26 +5,21 @@ using MomOi.API.Repositories;
 using MomOi.API.Services.BusinessRules;
 using System;
 using System.Linq;
+using MomOi.API.Constants;
 using System.Threading.Tasks;
 
 namespace MomOi.API.Services.Lifestyle
 {
     public class LifestyleService : ILifestyleService
     {
-        private readonly IGenericRepository<LifestyleEntry> _entryRepo;
-        private readonly IGenericRepository<LifestyleAlert> _alertRepo;
-        private readonly IGenericRepository<MomHealthProfile> _profileRepo;
+        private readonly IUnitOfWork _unitOfWork;
         private readonly IBusinessRuleEngine _ruleEngine;
 
         public LifestyleService(
-            IGenericRepository<LifestyleEntry> entryRepo,
-            IGenericRepository<LifestyleAlert> alertRepo,
-            IGenericRepository<MomHealthProfile> profileRepo,
+            IUnitOfWork unitOfWork,
             IBusinessRuleEngine ruleEngine)
         {
-            _entryRepo = entryRepo;
-            _alertRepo = alertRepo;
-            _profileRepo = profileRepo;
+            _unitOfWork = unitOfWork;
             _ruleEngine = ruleEngine;
         }
 
@@ -34,9 +29,9 @@ namespace MomOi.API.Services.Lifestyle
             if (!validStress.Contains(request.StressLevel))
                 return ApiResponse<object>.FailureResult("Mức độ căng thẳng phải là: 'Low', 'Moderate', hoặc 'High'.");
 
-            var today = DateTime.UtcNow.Date;
+            var today = VietnamTime.Today;
 
-            var existing = await _entryRepo.FirstOrDefaultAsync(e => e.UserId == userId && e.Date == today);
+            var existing = await _unitOfWork.Repository<LifestyleEntry>().FirstOrDefaultAsync(e => e.UserId == userId && e.Date == today);
 
             if (existing != null)
             {
@@ -54,7 +49,7 @@ namespace MomOi.API.Services.Lifestyle
                 existing.HealthScore = ComputeHealthScore(request);
                 existing.LifestyleProfile = ClassifyProfile(request);
                 existing.UpdatedAt = DateTime.UtcNow;
-                _entryRepo.Update(existing);
+                _unitOfWork.Repository<LifestyleEntry>().Update(existing);
             }
             else
             {
@@ -78,24 +73,27 @@ namespace MomOi.API.Services.Lifestyle
                 entry.CreatedAt = DateTime.UtcNow;
                 entry.UpdatedAt = DateTime.UtcNow;
                 
-                await _entryRepo.AddAsync(entry);
+                await _unitOfWork.Repository<LifestyleEntry>().AddAsync(entry);
                 existing = entry;
             }
 
-            await _entryRepo.SaveChangesAsync();
+            // COMMIT 1 — cố ý tách riêng: "ghi nhật ký lối sống" phải thành công độc
+            // lập với "sinh cảnh báo". Khối try/catch bên dưới nuốt lỗi, nên nếu gộp
+            // xuống đó thì rule engine lỗi sẽ làm MẤT LUÔN nhật ký mẹ vừa nhập.
+            await _unitOfWork.SaveChangesAsync();
 
             try
             {
-                var profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId);
+                var profile = await _unitOfWork.Repository<MomHealthProfile>().FirstOrDefaultAsync(p => p.UserId == userId);
                 if (profile != null)
                 {
                     var rules = await _ruleEngine.EvaluateAsync(profile);
-                    var oldAlerts = await _alertRepo.FindAsync(a => a.UserId == userId);
-                    _alertRepo.RemoveRange(oldAlerts);
+                    var oldAlerts = await _unitOfWork.Repository<LifestyleAlert>().FindAsync(a => a.UserId == userId);
+                    _unitOfWork.Repository<LifestyleAlert>().RemoveRange(oldAlerts);
 
                     foreach (var rule in rules)
                     {
-                        await _alertRepo.AddAsync(new LifestyleAlert
+                        await _unitOfWork.Repository<LifestyleAlert>().AddAsync(new LifestyleAlert
                         {
                             UserId = userId,
                             RuleId = rule.RuleId,
@@ -109,7 +107,7 @@ namespace MomOi.API.Services.Lifestyle
                             UpdatedAt = DateTime.UtcNow
                         });
                     }
-                    await _alertRepo.SaveChangesAsync();
+                    await _unitOfWork.SaveChangesAsync();
                 }
             }
             catch (Exception ex)
@@ -122,8 +120,8 @@ namespace MomOi.API.Services.Lifestyle
 
         public async Task<ApiResponse<object>> GetTodayEntryAsync(string userId)
         {
-            var today = DateTime.UtcNow.Date;
-            var entry = await _entryRepo.FirstOrDefaultAsync(e => e.UserId == userId && e.Date == today);
+            var today = VietnamTime.Today;
+            var entry = await _unitOfWork.Repository<LifestyleEntry>().FirstOrDefaultAsync(e => e.UserId == userId && e.Date == today);
 
             if (entry == null)
             {
@@ -135,8 +133,8 @@ namespace MomOi.API.Services.Lifestyle
 
         public async Task<ApiResponse<object>> GetHistoryAsync(string userId, int days)
         {
-            var startDate = DateTime.UtcNow.Date.AddDays(-days);
-            var allEntries = await _entryRepo.FindAsync(e => e.UserId == userId && e.Date >= startDate);
+            var startDate = VietnamTime.Today.AddDays(-days);
+            var allEntries = await _unitOfWork.Repository<LifestyleEntry>().FindAsync(e => e.UserId == userId && e.Date >= startDate);
             var history = allEntries.OrderBy(e => e.Date).ToList();
 
             return ApiResponse<object>.SuccessResult(history, "Lấy lịch sử lối sống thành công.");
@@ -145,7 +143,7 @@ namespace MomOi.API.Services.Lifestyle
         public async Task<ApiResponse<object>> GetAlertsAsync(string userId)
         {
             var sevenDaysAgo = DateTime.UtcNow.AddDays(-7);
-            var allAlerts = await _alertRepo.FindAsync(a => a.UserId == userId && a.TriggeredAt >= sevenDaysAgo && a.Severity == AlertSeverity.High);
+            var allAlerts = await _unitOfWork.Repository<LifestyleAlert>().FindAsync(a => a.UserId == userId && a.TriggeredAt >= sevenDaysAgo && a.Severity == AlertSeverity.High);
             var alerts = allAlerts.OrderByDescending(a => a.TriggeredAt).ToList();
 
             return ApiResponse<object>.SuccessResult(alerts, "Lấy cảnh báo lối sống 7 ngày gần nhất thành công.");
@@ -153,7 +151,7 @@ namespace MomOi.API.Services.Lifestyle
 
         public async Task<ApiResponse<object>> GetSummaryAsync(string userId)
         {
-            var allEntries = await _entryRepo.FindAsync(e => e.UserId == userId);
+            var allEntries = await _unitOfWork.Repository<LifestyleEntry>().FindAsync(e => e.UserId == userId);
             var entries = allEntries.OrderByDescending(e => e.Date).ToList();
 
             if (!entries.Any())
@@ -169,7 +167,7 @@ namespace MomOi.API.Services.Lifestyle
             var avgHealthScore = (int)Math.Round(entries.Average(e => e.HealthScore));
 
             int streakCount = 0;
-            var today = DateTime.UtcNow.Date;
+            var today = VietnamTime.Today;
             var yesterday = today.AddDays(-1);
             var latestDate = entries[0].Date;
 

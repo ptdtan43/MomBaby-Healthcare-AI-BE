@@ -221,10 +221,6 @@ namespace MomOi.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("date_of_birth");
 
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
                     b.Property<string[]>("FoodHistory")
                         .IsRequired()
                         .HasColumnType("text[]")
@@ -233,10 +229,6 @@ namespace MomOi.API.Migrations
                     b.Property<int>("Gender")
                         .HasColumnType("integer")
                         .HasColumnName("gender");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -274,10 +266,6 @@ namespace MomOi.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("text")
@@ -286,10 +274,6 @@ namespace MomOi.API.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
 
                     b.Property<string>("Operator")
                         .IsRequired()
@@ -341,14 +325,6 @@ namespace MomOi.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
-
                     b.Property<int>("Sender")
                         .HasColumnType("integer")
                         .HasColumnName("sender");
@@ -388,14 +364,6 @@ namespace MomOi.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
-
                     b.Property<string>("SessionId")
                         .HasColumnType("text")
                         .HasColumnName("session_id");
@@ -430,14 +398,6 @@ namespace MomOi.API.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
 
                     b.Property<bool>("IsResolved")
                         .HasColumnType("boolean")
@@ -505,17 +465,9 @@ namespace MomOi.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
                     b.Property<DateTime?>("EndDate")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("end_date");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
 
                     b.Property<int>("ProfileId")
                         .HasColumnType("integer")
@@ -592,10 +544,6 @@ namespace MomOi.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("date");
 
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
                     b.Property<int>("EpdsScore")
                         .HasColumnType("integer")
                         .HasColumnName("epds_score");
@@ -611,10 +559,6 @@ namespace MomOi.API.Migrations
                     b.Property<bool>("HadLunch")
                         .HasColumnType("boolean")
                         .HasColumnName("had_lunch");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
 
                     b.Property<string>("MoodNote")
                         .HasColumnType("text")
@@ -697,17 +641,9 @@ namespace MomOi.API.Migrations
                         .HasColumnType("text")
                         .HasColumnName("daily_meals_json");
 
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
                     b.Property<int>("GeneratedFrom")
                         .HasColumnType("integer")
                         .HasColumnName("generated_from");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
 
                     b.Property<DateTime?>("MonitoringDate")
                         .HasColumnType("timestamp with time zone")
@@ -757,14 +693,6 @@ namespace MomOi.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
-
                     b.Property<int>("ProfileId")
                         .HasColumnType("integer")
                         .HasColumnName("profile_id");
@@ -799,10 +727,6 @@ namespace MomOi.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
                     b.Property<int>("DurationMinutes")
                         .HasColumnType("integer")
                         .HasColumnName("duration_minutes");
@@ -811,10 +735,6 @@ namespace MomOi.API.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("exercise_type");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
 
                     b.Property<DateTime>("RecordedAt")
                         .HasColumnType("timestamp with time zone")
@@ -909,14 +829,6 @@ namespace MomOi.API.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("daily_monitoring_log_id");
 
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
-
                     b.Property<string>("Message")
                         .IsRequired()
                         .HasColumnType("text")
@@ -984,17 +896,9 @@ namespace MomOi.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("date");
 
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
                     b.Property<int>("HealthScore")
                         .HasColumnType("integer")
                         .HasColumnName("health_score");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
 
                     b.Property<int>("LifestyleProfile")
                         .HasColumnType("integer")
@@ -1183,10 +1087,6 @@ namespace MomOi.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
                     b.Property<DateTime?>("DeliveryDate")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("delivery_date");
@@ -1202,10 +1102,6 @@ namespace MomOi.API.Migrations
                     b.Property<bool>("IsBreastfeeding")
                         .HasColumnType("boolean")
                         .HasColumnName("is_breastfeeding");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
 
                     b.Property<DateTime?>("LastPeriodDate")
                         .HasColumnType("timestamp with time zone")
@@ -1263,14 +1159,6 @@ namespace MomOi.API.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
 
                     b.Property<string>("Message")
                         .IsRequired()
@@ -1331,14 +1219,6 @@ namespace MomOi.API.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("days_postpartum");
 
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
-
                     b.Property<string>("Mood")
                         .HasColumnType("text")
                         .HasColumnName("mood");
@@ -1382,17 +1262,9 @@ namespace MomOi.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
                     b.Property<float?>("DiastolicBp")
                         .HasColumnType("real")
                         .HasColumnName("diastolic_bp");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
 
                     b.Property<string>("Notes")
                         .HasColumnType("text")
@@ -1457,10 +1329,6 @@ namespace MomOi.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("text")
@@ -1491,10 +1359,6 @@ namespace MomOi.API.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("ingredients_json");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
 
                     b.Property<bool>("IsSaved")
                         .HasColumnType("boolean")
@@ -1581,10 +1445,6 @@ namespace MomOi.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
                     b.Property<string[]>("DietarySuggestions")
                         .IsRequired()
                         .HasColumnType("text[]")
@@ -1615,10 +1475,6 @@ namespace MomOi.API.Migrations
                     b.Property<bool>("IsAdminReviewRequired")
                         .HasColumnType("boolean")
                         .HasColumnName("is_admin_review_required");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
 
                     b.Property<string>("LifestyleConnection")
                         .HasColumnType("text")
@@ -1712,17 +1568,9 @@ namespace MomOi.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
                     b.Property<int>("DoseNumber")
                         .HasColumnType("integer")
                         .HasColumnName("dose_number");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
 
                     b.Property<string>("Notes")
                         .HasColumnType("text")
@@ -1817,14 +1665,6 @@ namespace MomOi.API.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("phone_number_confirmed");
 
-                    b.Property<string>("RefreshToken")
-                        .HasColumnType("text")
-                        .HasColumnName("refresh_token");
-
-                    b.Property<DateTime?>("RefreshTokenExpiryTime")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("refresh_token_expiry_time");
-
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("text")
                         .HasColumnName("security_stamp");
@@ -1881,10 +1721,6 @@ namespace MomOi.API.Migrations
                         .HasColumnType("text")
                         .HasColumnName("currency");
 
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
                     b.Property<int>("DurationMonths")
                         .HasColumnType("integer")
                         .HasColumnName("duration_months");
@@ -1892,10 +1728,6 @@ namespace MomOi.API.Migrations
                     b.Property<string>("FailureReason")
                         .HasColumnType("text")
                         .HasColumnName("failure_reason");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
 
                     b.Property<string>("OrderCode")
                         .IsRequired()
@@ -1946,6 +1778,12 @@ namespace MomOi.API.Migrations
                         .HasColumnType("text")
                         .HasColumnName("user_id");
 
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.HasKey("Id")
                         .HasName("pk_payment_transactions");
 
@@ -1957,6 +1795,50 @@ namespace MomOi.API.Migrations
                         .HasDatabaseName("ix_payment_transactions_user_id");
 
                     b.ToTable("payment_transactions", (string)null);
+                });
+
+            modelBuilder.Entity("MomOi.API.Models.Identity.UserRefreshToken", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("token_hash");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_user_refresh_tokens");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("ix_user_refresh_tokens_token_hash");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_user_refresh_tokens_user_id");
+
+                    b.ToTable("user_refresh_tokens", (string)null);
                 });
 
             modelBuilder.Entity("MomOi.API.Models.Nutrition.BabyFoodLog", b =>
@@ -1981,17 +1863,9 @@ namespace MomOi.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
                     b.Property<string>("IntroducedFoodName")
                         .HasColumnType("text")
                         .HasColumnName("introduced_food_name");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
 
                     b.Property<DateTime>("LoggedAt")
                         .HasColumnType("timestamp with time zone")
@@ -2109,10 +1983,6 @@ namespace MomOi.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
                     b.Property<float>("Fat")
                         .HasColumnType("real")
                         .HasColumnName("fat");
@@ -2121,10 +1991,6 @@ namespace MomOi.API.Migrations
                         .IsRequired()
                         .HasColumnType("text[]")
                         .HasColumnName("food_items");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
 
                     b.Property<DateTime>("LoggedAt")
                         .HasColumnType("timestamp with time zone")
@@ -2177,10 +2043,6 @@ namespace MomOi.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("text")
@@ -2193,10 +2055,6 @@ namespace MomOi.API.Migrations
                     b.Property<int>("FdcId")
                         .HasColumnType("integer")
                         .HasColumnName("fdc_id");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
 
                     b.Property<float>("Protein")
                         .HasColumnType("real")
@@ -2525,6 +2383,18 @@ namespace MomOi.API.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_payment_transactions_users_user_id");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("MomOi.API.Models.Identity.UserRefreshToken", b =>
+                {
+                    b.HasOne("MomOi.API.Models.Identity.AppUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_refresh_tokens_users_user_id");
 
                     b.Navigation("User");
                 });

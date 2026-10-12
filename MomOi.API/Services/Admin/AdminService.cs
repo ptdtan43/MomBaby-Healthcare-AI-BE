@@ -17,16 +17,16 @@ namespace MomOi.API.Services.Admin
 {
     public class AdminService : IAdminService
     {
-        private readonly AppDbContext _context;
+        private readonly IUnitOfWork _unitOfWork;
         private readonly UserManager<AppUser> _userManager;
         private readonly IUsdaClientService _usdaClientService;
 
         public AdminService(
-            AppDbContext context, 
+            IUnitOfWork unitOfWork, 
             UserManager<AppUser> userManager,
             IUsdaClientService usdaClientService)
         {
-            _context = context;
+            _unitOfWork = unitOfWork;
             _userManager = userManager;
             _usdaClientService = usdaClientService;
         }
@@ -110,7 +110,7 @@ namespace MomOi.API.Services.Admin
 
         public async Task<ApiResponse<object>> GetBusinessRulesAsync()
         {
-            var rules = await _context.BusinessRules.ToListAsync();
+            var rules = await _unitOfWork.Repository<BusinessRule>().Query(asNoTracking: true).ToListAsync();
             return ApiResponse<object>.SuccessResult(rules, "Lấy danh sách Business Rules thành công.");
         }
 
@@ -130,15 +130,15 @@ namespace MomOi.API.Services.Admin
                 UpdatedAt = DateTime.UtcNow
             };
 
-            _context.BusinessRules.Add(rule);
-            await _context.SaveChangesAsync();
+            await _unitOfWork.Repository<BusinessRule>().AddAsync(rule);
+            await _unitOfWork.SaveChangesAsync();
 
             return ApiResponse<object>.SuccessResult(rule, "Tạo Business Rule thành công.");
         }
 
         public async Task<ApiResponse<object>> UpdateBusinessRuleAsync(int id, BusinessRuleDto dto)
         {
-            var rule = await _context.BusinessRules.FindAsync(id);
+            var rule = await _unitOfWork.Repository<BusinessRule>().GetByIdAsync(id);
             if (rule == null) return ApiResponse<object>.FailureResult("Không tìm thấy Rule.");
 
             rule.Code = dto.Code;
@@ -151,17 +151,17 @@ namespace MomOi.API.Services.Admin
             rule.IsActive = dto.IsActive;
             rule.UpdatedAt = DateTime.UtcNow;
 
-            await _context.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
             return ApiResponse<object>.SuccessResult(rule, "Cập nhật Business Rule thành công.");
         }
 
         public async Task<ApiResponse<object>> DeleteBusinessRuleAsync(int id)
         {
-            var rule = await _context.BusinessRules.FindAsync(id);
+            var rule = await _unitOfWork.Repository<BusinessRule>().GetByIdAsync(id);
             if (rule == null) return ApiResponse<object>.FailureResult("Không tìm thấy Rule.");
 
-            _context.BusinessRules.Remove(rule);
-            await _context.SaveChangesAsync();
+            _unitOfWork.Repository<BusinessRule>().Remove(rule);
+            await _unitOfWork.SaveChangesAsync();
             return ApiResponse<object>.SuccessResult((object)"OK", "Xóa Business Rule thành công.");
         }
 
@@ -177,12 +177,12 @@ namespace MomOi.API.Services.Admin
         public async Task<ApiResponse<object>> GetUsersAtRiskAsync()
         {
             // Read active logs from CriticalAlertLogs
-            var criticalLogs = await _context.CriticalAlertLogs
+            var criticalLogs = await _unitOfWork.Repository<CriticalAlertLog>().Query(asNoTracking: true)
                 .Where(c => !c.IsResolved)
                 .ToListAsync();
 
             // Read pending alerts from LifestyleAlerts
-            var lifestyleAlerts = await _context.LifestyleAlerts
+            var lifestyleAlerts = await _unitOfWork.Repository<LifestyleAlert>().Query(asNoTracking: true)
                 .Where(a => a.Status == AlertStatus.Pending && (a.Severity == AlertSeverity.High || a.Severity == AlertSeverity.Critical))
                 .ToListAsync();
 
@@ -251,7 +251,7 @@ namespace MomOi.API.Services.Admin
 
         public async Task<ApiResponse<object>> GetReportsSummaryAsync()
         {
-            var lifestyle = await _context.LifestyleEntries.ToListAsync();
+            var lifestyle = await _unitOfWork.Repository<LifestyleEntry>().Query(asNoTracking: true).ToListAsync();
 
             var stressDist = new
             {
@@ -260,7 +260,7 @@ namespace MomOi.API.Services.Admin
                 StressHigh = lifestyle.Count(l => l.StressLevel == StressLevel.High)
             };
 
-            var scoreTrend = await _context.LifestyleEntries
+            var scoreTrend = await _unitOfWork.Repository<LifestyleEntry>().Query(asNoTracking: true)
                 .GroupBy(e => e.Date.Date)
                 .Select(g => new
                 {
@@ -270,7 +270,7 @@ namespace MomOi.API.Services.Admin
                 .OrderBy(x => x.date)
                 .ToListAsync();
 
-            var topRules = await _context.LifestyleAlerts
+            var topRules = await _unitOfWork.Repository<LifestyleAlert>().Query(asNoTracking: true)
                 .GroupBy(a => a.RuleId)
                 .Select(g => new { ruleId = g.Key, count = g.Count() })
                 .OrderByDescending(x => x.count)
@@ -291,7 +291,7 @@ namespace MomOi.API.Services.Admin
             var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
             var todayStart = now.Date;
 
-            var completedTransactions = await _context.PaymentTransactions
+            var completedTransactions = await _unitOfWork.Repository<PaymentTransaction>().Query(asNoTracking: true)
                 .Include(t => t.User)
                 .Where(t => t.Status == PaymentStatus.Completed)
                 .OrderByDescending(t => t.PaidAt ?? t.UpdatedAt)
@@ -382,7 +382,7 @@ namespace MomOi.API.Services.Admin
 
         public async Task<ApiResponse<object>> GetPaymentTransactionsAsync(string? status, string? email, DateTime? from, DateTime? to)
         {
-            var query = _context.PaymentTransactions
+            var query = _unitOfWork.Repository<PaymentTransaction>().Query(asNoTracking: true)
                 .Include(t => t.User)
                 .AsQueryable();
 
@@ -448,7 +448,7 @@ namespace MomOi.API.Services.Admin
 
         public async Task<ApiResponse<object>> GetFeedbackTicketsAsync()
         {
-            var tickets = await _context.NotificationAlerts
+            var tickets = await _unitOfWork.Repository<NotificationAlert>().Query(asNoTracking: true)
                 .Include(a => a.User)
                 .Where(a => a.Message.StartsWith("[FEEDBACK]"))
                 .OrderByDescending(a => a.CreatedAt)

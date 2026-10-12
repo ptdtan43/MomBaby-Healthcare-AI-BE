@@ -11,12 +11,12 @@ namespace MomOi.API.Services.Diet
 {
     public class DietService : IDietService
     {
-        private readonly IGenericRepository<DietPlan> _dietRepo;
+        private readonly IUnitOfWork _unitOfWork;
         private readonly IGeminiService _geminiService;
 
-        public DietService(IGenericRepository<DietPlan> dietRepo, IGeminiService geminiService)
+        public DietService(IUnitOfWork unitOfWork, IGeminiService geminiService)
         {
-            _dietRepo = dietRepo;
+            _unitOfWork = unitOfWork;
             _geminiService = geminiService;
         }
 
@@ -65,15 +65,15 @@ namespace MomOi.API.Services.Diet
                 UpdatedAt = DateTime.UtcNow
             };
 
-            await _dietRepo.AddAsync(dietPlan);
-            await _dietRepo.SaveChangesAsync();
+            await _unitOfWork.Repository<DietPlan>().AddAsync(dietPlan);
+            await _unitOfWork.SaveChangesAsync();
 
             return ApiResponse<object>.SuccessResult(dietPlan, "Tạo thực đơn thành công.");
         }
 
         public async Task<ApiResponse<object>> GetDietPlanAsync(string userId)
         {
-            var allPlans = await _dietRepo.FindAsync(d => d.UserId == userId);
+            var allPlans = await _unitOfWork.Repository<DietPlan>().FindAsync(d => d.UserId == userId);
             var dietPlan = allPlans.OrderByDescending(d => d.CreatedAt).FirstOrDefault();
 
             if (dietPlan == null) return ApiResponse<object>.FailureResult("Không tìm thấy thực đơn.");
@@ -83,7 +83,7 @@ namespace MomOi.API.Services.Diet
 
         public async Task<ApiResponse<object>> UpdateDietPlanAsync(string userId, UpdateDietPlanRequestDto request)
         {
-            var allPlans = await _dietRepo.FindAsync(d => d.UserId == userId);
+            var allPlans = await _unitOfWork.Repository<DietPlan>().FindAsync(d => d.UserId == userId);
             var dietPlan = allPlans.OrderByDescending(d => d.CreatedAt).FirstOrDefault();
 
             if (dietPlan == null) return ApiResponse<object>.FailureResult("Không tìm thấy thực đơn để cập nhật.");
@@ -91,8 +91,8 @@ namespace MomOi.API.Services.Diet
             dietPlan.DailyMealsJson = request.DailyMealsJson;
             dietPlan.UpdatedAt = DateTime.UtcNow;
 
-            _dietRepo.Update(dietPlan);
-            await _dietRepo.SaveChangesAsync();
+            _unitOfWork.Repository<DietPlan>().Update(dietPlan);
+            await _unitOfWork.SaveChangesAsync();
 
             return ApiResponse<object>.SuccessResult(dietPlan, "Cập nhật thực đơn thành công.");
         }
@@ -101,7 +101,7 @@ namespace MomOi.API.Services.Diet
         {
             var aiResponseJson = await _geminiService.GenerateAiDietRecipeAsync(request.Query);
 
-            var allPlans = await _dietRepo.FindAsync(d => d.UserId == userId);
+            var allPlans = await _unitOfWork.Repository<DietPlan>().FindAsync(d => d.UserId == userId);
             var dietPlan = allPlans.OrderByDescending(d => d.CreatedAt).FirstOrDefault();
 
             if (dietPlan == null) return ApiResponse<object>.FailureResult("Không tìm thấy thực đơn để thêm món AI.");

@@ -5,7 +5,7 @@ namespace MomOi.API.Models.Nutrition
     /// <summary>
     /// Represents an allergen constraint/record for a maternal user.
     /// </summary>
-    public class FoodAllergyRecord : BaseEntity
+    public class FoodAllergyRecord : SoftDeletableEntity
     {
         /// <summary>
         /// Foreign key to AppUser (linked by UserId).

@@ -5,23 +5,21 @@ using MomOi.API.Services.BusinessRules;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using MomOi.API.Constants;
 using System.Threading.Tasks;
 
 namespace MomOi.API.Services.Fertility
 {
     public class FertilityService : IFertilityService
     {
-        private readonly IGenericRepository<MomHealthProfile> _profileRepo;
-        private readonly IGenericRepository<CycleLog> _cycleRepo;
+        private readonly IUnitOfWork _unitOfWork;
         private readonly IBusinessRuleEngine _ruleEngine;
 
         public FertilityService(
-            IGenericRepository<MomHealthProfile> profileRepo,
-            IGenericRepository<CycleLog> cycleRepo,
+            IUnitOfWork unitOfWork,
             IBusinessRuleEngine ruleEngine)
         {
-            _profileRepo = profileRepo;
-            _cycleRepo = cycleRepo;
+            _unitOfWork = unitOfWork;
             _ruleEngine = ruleEngine;
         }
 
@@ -33,7 +31,8 @@ namespace MomOi.API.Services.Fertility
             }
 
             periodStartDate = DateTime.SpecifyKind(periodStartDate.Date, DateTimeKind.Utc);
-            var profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId);
+            var profile = await _unitOfWork.Repository<MomHealthProfile>()
+                .FirstOrDefaultAsync(p => p.UserId == userId);
 
             if (profile == null)
             {
@@ -52,9 +51,11 @@ namespace MomOi.API.Services.Fertility
                 Symptoms = string.Join(",", symptoms)
             };
 
-            await _cycleRepo.AddAsync(log);
-            _profileRepo.Update(profile);
-            await _profileRepo.SaveChangesAsync();
+            // Thêm CycleLog và cập nhật MomHealthProfile là MỘT nghiệp vụ:
+            // hoặc ghi được cả hai, hoặc không ghi gì. Nên chỉ commit một lần ở cuối.
+            await _unitOfWork.Repository<CycleLog>().AddAsync(log);
+            _unitOfWork.Repository<MomHealthProfile>().Update(profile);
+            await _unitOfWork.SaveChangesAsync();
 
             var ovulationDay = periodStartDate.AddDays(cycleLength - 14);
             var result = new
@@ -70,7 +71,8 @@ namespace MomOi.API.Services.Fertility
 
         public async Task<ApiResponse<object>> GetCalendarAsync(string userId, string month)
         {
-            var profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId);
+            var profile = await _unitOfWork.Repository<MomHealthProfile>()
+                .FirstOrDefaultAsync(p => p.UserId == userId, asNoTracking: true);
 
             if (profile == null || !profile.LastPeriodDate.HasValue)
             {
@@ -127,7 +129,8 @@ namespace MomOi.API.Services.Fertility
 
         public async Task<ApiResponse<object>> GetOvulationTodayAsync(string userId)
         {
-            var profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId);
+            var profile = await _unitOfWork.Repository<MomHealthProfile>()
+                .FirstOrDefaultAsync(p => p.UserId == userId, asNoTracking: true);
 
             if (profile == null || !profile.LastPeriodDate.HasValue)
             {
@@ -142,7 +145,7 @@ namespace MomOi.API.Services.Fertility
             var alerts = await _ruleEngine.EvaluateAsync(profile);
             var br01Alert = alerts.FirstOrDefault(a => a.RuleId == "BR01");
 
-            var today = DateTime.UtcNow.Date;
+            var today = VietnamTime.Today;
             var cycleLength = profile.AvgCycleLength ?? 28;
             var lastPeriod = profile.LastPeriodDate.Value.Date;
 

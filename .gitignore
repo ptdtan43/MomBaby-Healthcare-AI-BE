@@ -42,6 +42,24 @@ firebase-adminsdk.json
 uploads/
 
 # =========================
+# Database backups & dumps
+# =========================
+# CẢNH BÁO: file dump chứa DỮ LIỆU CÁ NHÂN THẬT của người dùng — email, tên,
+# hash mật khẩu, refresh token (bảng asp_net_users), hồ sơ sức khoẻ mẹ và bé.
+# Đây là dữ liệu thuộc phạm vi Nghị định 13/2023/NĐ-CP. Lỡ commit thì xoá file
+# sau đó KHÔNG làm nó biến mất khỏi lịch sử Git, nên phải chặn ngay từ đầu.
+#
+# Cố ý KHÔNG dùng "*.sql" để chặn tất cả: sau này project có thể cần commit
+# script SQL hợp lệ (seed dữ liệu, script vá thủ công). Chặn cả loại đó sẽ làm
+# chúng biến mất âm thầm mà không ai biết vì sao.
+backup*.sql
+*_backup.sql
+dump*.sql
+*.dump
+*.bak
+*.backup
+
+# =========================
 # OS generated files
 # =========================
 .DS_Store

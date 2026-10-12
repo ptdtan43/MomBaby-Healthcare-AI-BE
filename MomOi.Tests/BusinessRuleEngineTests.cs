@@ -58,11 +58,24 @@ namespace MomOi.Tests
         [Fact]
         public void EvaluateEpdsScore_WithLowRisk_ShouldReturnLowRisk()
         {
-            int[] answers = new[] { 0, 0, 0, 0, 0, 0, 1, 1, 1, 1 };
+            int[] answers = new[] { 0, 0, 0, 0, 0, 1, 1, 1, 1, 0 };
             var result = _engine.EvaluateEpdsScore(answers);
             Assert.False(result.IsUrgent);
             Assert.Equal("Low", result.RiskLevel);
             Assert.Contains("Tâm lý của bạn đang ổn định", result.Recommendation);
+        }
+
+        [Theory]
+        [InlineData(1)]
+        [InlineData(2)]
+        [InlineData(3)]
+        public void EvaluateEpdsScore_AnySelfHarmAnswer_IsUrgentRegardlessOfTotal(int question10)
+        {
+            int[] answers = new[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, question10 };
+            var result = _engine.EvaluateEpdsScore(answers);
+            Assert.True(result.IsUrgent);
+            Assert.Equal("High", result.RiskLevel);
+            Assert.Contains("115", result.Recommendation);
         }
 
         [Theory]

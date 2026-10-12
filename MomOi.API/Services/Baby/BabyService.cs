@@ -12,31 +12,25 @@ namespace MomOi.API.Services.Baby
 {
     public class BabyService : IBabyService
     {
-        private readonly IGenericRepository<BabyProfile> _babyRepo;
-        private readonly IGenericRepository<GrowthRecord> _growthRepo;
+        private readonly IUnitOfWork _unitOfWork;
         private readonly IBusinessRuleEngine _businessRuleEngine;
         private readonly Nutrition.NutritionProxyService _nutritionProxy;
-        private readonly IGenericRepository<MomOi.API.Models.Health.Recipe> _recipeRepo;
 
         public BabyService(
-            IGenericRepository<BabyProfile> babyRepo,
-            IGenericRepository<GrowthRecord> growthRepo,
+            IUnitOfWork unitOfWork,
             IBusinessRuleEngine businessRuleEngine,
-            Nutrition.NutritionProxyService nutritionProxy,
-            IGenericRepository<MomOi.API.Models.Health.Recipe> recipeRepo)
+            Nutrition.NutritionProxyService nutritionProxy)
         {
-            _babyRepo = babyRepo;
-            _growthRepo = growthRepo;
+            _unitOfWork = unitOfWork;
             _businessRuleEngine = businessRuleEngine;
             _nutritionProxy = nutritionProxy;
-            _recipeRepo = recipeRepo;
         }
 
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, object> _dailyMenuCache = new();
 
         public async Task<ApiResponse<object>> GetBabyMenuAsync(string userId, int babyId, bool weekly, bool forceRefresh = false)
         {
-            var baby = await _babyRepo.FirstOrDefaultAsync(b => b.Id == babyId && b.UserId == userId);
+            var baby = await _unitOfWork.Repository<BabyProfile>().FirstOrDefaultAsync(b => b.Id == babyId && b.UserId == userId);
             if (baby == null)
                 return ApiResponse<object>.FailureResult("Không tìm thấy hồ sơ bé.");
 
@@ -78,7 +72,7 @@ namespace MomOi.API.Services.Baby
             try
             {
                 // Tự động làm sạch các Title bị ô nhiễm do debug suffix trong DB (Self-healing)
-                var corruptedRecipes = await _recipeRepo.FindAsync(r => 
+                var corruptedRecipes = await _unitOfWork.Repository<MomOi.API.Models.Health.Recipe>().FindAsync(r => 
                     r.Category == RecipeCategory.Baby && 
                     r.Title != null &&
                     (r.Title.Contains(" (FOUND DB:") || r.Title.Contains(" (NEW DB:")));
@@ -94,10 +88,10 @@ namespace MomOi.API.Services.Baby
                             cr.Title = cr.Title.Substring(0, idx).Trim();
                         }
                     }
-                    await _recipeRepo.SaveChangesAsync();
+                    await _unitOfWork.SaveChangesAsync();
                 }
 
-                var existingRecipes = await _recipeRepo.FindAsync(r =>
+                var existingRecipes = await _unitOfWork.Repository<MomOi.API.Models.Health.Recipe>().FindAsync(r =>
                     r.UserId == userId && r.Category == RecipeCategory.Baby);
 
                 // Bản ghi mới nhất cho mỗi tên món (chuẩn hóa chữ thường, xóa khoảng trắng)
@@ -176,11 +170,11 @@ namespace MomOi.API.Services.Baby
 
                 foreach (var r in newRows)
                 {
-                    await _recipeRepo.AddAsync(r);
+                    await _unitOfWork.Repository<MomOi.API.Models.Health.Recipe>().AddAsync(r);
                 }
                 if (newRows.Count > 0)
                 {
-                    await _recipeRepo.SaveChangesAsync();
+                    await _unitOfWork.SaveChangesAsync();
                 }
 
                 menu = jsonNode!;
@@ -197,17 +191,17 @@ namespace MomOi.API.Services.Baby
         public async Task<ApiResponse<BabyProfile>> CreateBabyProfileAsync(string userId, BabyProfile profile)
         {
             profile.UserId = userId;
-            await _babyRepo.AddAsync(profile);
-            await _babyRepo.SaveChangesAsync();
+            await _unitOfWork.Repository<BabyProfile>().AddAsync(profile);
+            await _unitOfWork.SaveChangesAsync();
 
             return ApiResponse<BabyProfile>.SuccessResult(profile, "Tạo hồ sơ cho bé thành công.");
         }
 
         public async Task<ApiResponse<List<BabyProfile>>> GetBabyProfilesAsync(string userId)
         {
-            var profiles = (await _babyRepo.FindAsync(p => p.UserId == userId)).ToList();
+            var profiles = (await _unitOfWork.Repository<BabyProfile>().FindAsync(p => p.UserId == userId)).ToList();
             var profileIds = profiles.Select(p => p.Id).ToList();
-            var growthRecords = (await _growthRepo.FindAsync(g => profileIds.Contains(g.BabyProfileId))).ToList();
+            var growthRecords = (await _unitOfWork.Repository<GrowthRecord>().FindAsync(g => profileIds.Contains(g.BabyProfileId))).ToList();
 
             foreach (var profile in profiles)
             {
@@ -219,7 +213,7 @@ namespace MomOi.API.Services.Baby
 
         public async Task<ApiResponse<GrowthEvaluationResult>> LogGrowthAsync(string userId, int babyId, GrowthRecord record)
         {
-            var baby = await _babyRepo.FirstOrDefaultAsync(b => b.Id == babyId && b.UserId == userId);
+            var baby = await _unitOfWork.Repository<BabyProfile>().FirstOrDefaultAsync(b => b.Id == babyId && b.UserId == userId);
             if (baby == null)
             {
                 return ApiResponse<GrowthEvaluationResult>.FailureResult("Không tìm thấy hồ sơ của bé.");
@@ -232,18 +226,18 @@ namespace MomOi.API.Services.Baby
                 record.RecordedAt = DateTime.UtcNow;
             }
 
-            await _growthRepo.AddAsync(record);
+            await _unitOfWork.Repository<GrowthRecord>().AddAsync(record);
 
             // Cập nhật chỉ số hiện tại của bé dựa trên mốc mới nhất (theo RecordedAt)
-            var allRecords = (await _growthRepo.FindAsync(g => g.BabyProfileId == babyId)).ToList();
+            var allRecords = (await _unitOfWork.Repository<GrowthRecord>().FindAsync(g => g.BabyProfileId == babyId)).ToList();
             allRecords.Add(record);
             var latestRecord = allRecords.OrderByDescending(g => g.RecordedAt).First();
 
             baby.CurrentWeightKg = latestRecord.WeightKg;
             baby.CurrentHeightCm = latestRecord.HeightCm;
 
-            _babyRepo.Update(baby);
-            await _babyRepo.SaveChangesAsync();
+            _unitOfWork.Repository<BabyProfile>().Update(baby);
+            await _unitOfWork.SaveChangesAsync();
 
             var evaluation = _businessRuleEngine.VerifyBabyGrowth(
                 Math.Max(0, (int)((record.RecordedAt - baby.DateOfBirth).TotalDays / 30.44)),
@@ -257,23 +251,23 @@ namespace MomOi.API.Services.Baby
 
         public async Task<ApiResponse<object>> DeleteGrowthRecordAsync(string userId, int babyId, int recordId)
         {
-            var baby = await _babyRepo.FirstOrDefaultAsync(b => b.Id == babyId && b.UserId == userId);
+            var baby = await _unitOfWork.Repository<BabyProfile>().FirstOrDefaultAsync(b => b.Id == babyId && b.UserId == userId);
             if (baby == null)
             {
                 return ApiResponse<object>.FailureResult("Không tìm thấy hồ sơ của bé.");
             }
 
-            var record = await _growthRepo.FirstOrDefaultAsync(g => g.Id == recordId && g.BabyProfileId == babyId);
+            var record = await _unitOfWork.Repository<GrowthRecord>().FirstOrDefaultAsync(g => g.Id == recordId && g.BabyProfileId == babyId);
             if (record == null)
             {
                 return ApiResponse<object>.FailureResult("Không tìm thấy chỉ số tăng trưởng.");
             }
 
-            _growthRepo.Remove(record);
-            await _growthRepo.SaveChangesAsync();
+            _unitOfWork.Repository<GrowthRecord>().Remove(record);
+            await _unitOfWork.SaveChangesAsync();
 
             // Cập nhật lại cân nặng/chiều cao hiện tại của bé dựa trên chỉ số mới nhất còn lại
-            var remainingRecords = (await _growthRepo.FindAsync(g => g.BabyProfileId == babyId))
+            var remainingRecords = (await _unitOfWork.Repository<GrowthRecord>().FindAsync(g => g.BabyProfileId == babyId))
                 .OrderByDescending(g => g.RecordedAt)
                 .ToList();
 
@@ -289,15 +283,15 @@ namespace MomOi.API.Services.Baby
                 baby.CurrentHeightCm = null;
             }
 
-            _babyRepo.Update(baby);
-            await _babyRepo.SaveChangesAsync();
+            _unitOfWork.Repository<BabyProfile>().Update(baby);
+            await _unitOfWork.SaveChangesAsync();
 
             return ApiResponse<object>.SuccessResult(null!, "Xóa chỉ số tăng trưởng thành công.");
         }
 
         public async Task<ApiResponse<BabyProfile>> UpdateBabyProfileAsync(string userId, int id, BabyProfile profile)
         {
-            var existing = await _babyRepo.FirstOrDefaultAsync(b => b.Id == id && b.UserId == userId);
+            var existing = await _unitOfWork.Repository<BabyProfile>().FirstOrDefaultAsync(b => b.Id == id && b.UserId == userId);
             if (existing == null)
             {
                 return ApiResponse<BabyProfile>.FailureResult("Không tìm thấy hồ sơ của bé.");
@@ -311,8 +305,8 @@ namespace MomOi.API.Services.Baby
             existing.Allergies = profile.Allergies;
             existing.FoodHistory = profile.FoodHistory;
 
-            _babyRepo.Update(existing);
-            await _babyRepo.SaveChangesAsync();
+            _unitOfWork.Repository<BabyProfile>().Update(existing);
+            await _unitOfWork.SaveChangesAsync();
 
             var todayStr = DateTime.UtcNow.ToString("yyyy-MM-dd");
             _dailyMenuCache.TryRemove($"daily_{userId}_{id}_{todayStr}", out _);

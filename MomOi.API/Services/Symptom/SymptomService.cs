@@ -15,22 +15,16 @@ namespace MomOi.API.Services.Symptom
 {
     public class SymptomService : ISymptomService
     {
-        private readonly IGenericRepository<MomHealthProfile> _profileRepo;
-        private readonly IGenericRepository<SymptomLog> _symptomRepo;
-        private readonly IGenericRepository<NotificationAlert> _alertRepo;
+        private readonly IUnitOfWork _unitOfWork;
         private readonly IGeminiService _geminiService;
         private readonly ILogger<SymptomService> _logger;
 
         public SymptomService(
-            IGenericRepository<MomHealthProfile> profileRepo,
-            IGenericRepository<SymptomLog> symptomRepo,
-            IGenericRepository<NotificationAlert> alertRepo,
+            IUnitOfWork unitOfWork,
             IGeminiService geminiService,
             ILogger<SymptomService> logger)
         {
-            _profileRepo = profileRepo;
-            _symptomRepo = symptomRepo;
-            _alertRepo = alertRepo;
+            _unitOfWork = unitOfWork;
             _geminiService = geminiService;
             _logger = logger;
         }
@@ -44,7 +38,7 @@ namespace MomOi.API.Services.Symptom
 
             var startTime = DateTime.UtcNow;
 
-            var profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId);
+            var profile = await _unitOfWork.Repository<MomHealthProfile>().FirstOrDefaultAsync(p => p.UserId == userId);
             var profileStage = profile?.Stage.ToString() ?? "unknown";
 
             var prompt = $"Bạn là chuyên gia tư vấn sức khỏe sản khoa. Phân tích các triệu chứng sau của mẹ " +
@@ -54,11 +48,14 @@ namespace MomOi.API.Services.Symptom
                          $"\"lifestyleConnection\":\"...\",\"urgencyLevel\":\"Thấp|Trung bình|Cao|Khẩn cấp\"," +
                          $"\"urgencyReason\":\"...\",\"recommendations\":[\"...\"],\"dietarySuggestions\":[\"...\"]," +
                          $"\"disclaimer\":\"...\",\"shouldSeeDoctor\":false,\"specialistType\":\"...\"," +
-                         $"\"severityScore\":0}}";
+                         $"\"severityScore\":0}}\n\n" +
+                         $"severityScore là số nguyên trên thang 0–100 (0 = không đáng lo, 100 = nguy hiểm tính mạng), " +
+                         $"phải nhất quán với urgencyLevel: Thấp 0–29, Trung bình 30–59, Cao 60–84, Khẩn cấp 85–100.";
 
             string aiResponseJson = string.Empty;
             int severityScore = 0;
-            UrgencyLevel urgencyLevel = UrgencyLevel.Low;
+            // null = chưa xác định (AI lỗi): không được mặc định "Low" vì sẽ trấn an sai người dùng.
+            UrgencyLevel? urgencyLevel = null;
             bool shouldSeeDoctor = false;
             bool aiSucceeded = false;
 
@@ -89,6 +86,10 @@ namespace MomOi.API.Services.Symptom
                 aiResponseJson = string.Empty;
             }
 
+            // Urgency is the primary signal: the score scale is model-dependent, the urgency label is not.
+            bool isSerious = aiSucceeded &&
+                (urgencyLevel is UrgencyLevel.High or UrgencyLevel.Critical || severityScore >= 70);
+
             var processingMs = (int)(DateTime.UtcNow - startTime).TotalMilliseconds;
 
             var log = new SymptomLog
@@ -103,31 +104,37 @@ namespace MomOi.API.Services.Symptom
                 UrgencyLevel = urgencyLevel,
                 ShouldSeeDoctor = shouldSeeDoctor,
                 SeverityScore = severityScore,
-                AlertFlag = severityScore >= 70,
+                AlertFlag = isSerious,
                 ProcessingTimeMs = processingMs,
                 GeminiModel = "gemini-2.5-flash",
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
 
-            await _symptomRepo.AddAsync(log);
+            await _unitOfWork.Repository<SymptomLog>().AddAsync(log);
 
-            if (severityScore >= 70)
+            if (isSerious)
             {
-                await _alertRepo.AddAsync(new NotificationAlert
+                var isCritical = urgencyLevel == UrgencyLevel.Critical;
+                await _unitOfWork.Repository<NotificationAlert>().AddAsync(new NotificationAlert
                 {
                     UserId = log.UserId,
                     Type = NotificationAlertType.Symptom,
-                    Severity = AlertSeverity.Medium,
-                    Message = $"Phát hiện triệu chứng nghiêm trọng (điểm {severityScore}/100). Vui lòng liên hệ bác sĩ ngay.",
+                    Severity = isCritical ? AlertSeverity.Critical : AlertSeverity.High,
+                    Message = isCritical
+                        ? "Triệu chứng của mami được đánh giá KHẨN CẤP. Hãy gọi Cấp cứu 115 hoặc đến bệnh viện gần nhất ngay."
+                        : "Phát hiện triệu chứng nghiêm trọng. Vui lòng liên hệ bác sĩ ngay.",
                     Status = NotificationStatus.Pending,
                     Channels = new[] { "email", "app" },
                     CreatedAt = DateTime.UtcNow
                 });
             }
 
-            await _symptomRepo.SaveChangesAsync();
-            await _alertRepo.SaveChangesAsync();
+            // SymptomLog và NotificationAlert (nếu có) thuộc cùng một nghiệp vụ
+            // "ghi nhận triệu chứng" => commit đúng MỘT lần.
+            // Bản cũ gọi save hai lần trên hai repository khác nhau; vì cả hai dùng
+            // chung một DbContext nên lần thứ hai thực chất không làm gì cả.
+            await _unitOfWork.SaveChangesAsync();
 
             var message = aiSucceeded
                 ? "Ghi nhận triệu chứng và phân tích AI thành công."
@@ -141,9 +148,9 @@ namespace MomOi.API.Services.Symptom
         /// onto the <see cref="UrgencyLevel"/> enum. English values are accepted as well so the
         /// mapping keeps working if the prompt is ever changed.
         /// </summary>
-        private static UrgencyLevel MapUrgencyLevel(string? value)
+        private static UrgencyLevel? MapUrgencyLevel(string? value)
         {
-            if (string.IsNullOrWhiteSpace(value)) return UrgencyLevel.Low;
+            if (string.IsNullOrWhiteSpace(value)) return null;
 
             return value.Trim().ToLowerInvariant() switch
             {
@@ -151,13 +158,13 @@ namespace MomOi.API.Services.Symptom
                 "trung bình" or "medium" => UrgencyLevel.Medium,
                 "cao" or "high" => UrgencyLevel.High,
                 "khẩn cấp" or "critical" => UrgencyLevel.Critical,
-                _ => UrgencyLevel.Low
+                _ => null
             };
         }
 
         public async Task<ApiResponse<object>> GetSymptomEntriesAsync(string userId, int? minSeverity)
         {
-            var allEntries = await _symptomRepo.FindAsync(s => s.UserId == userId);
+            var allEntries = await _unitOfWork.Repository<SymptomLog>().FindAsync(s => s.UserId == userId);
             var query = allEntries.AsEnumerable();
 
             if (minSeverity.HasValue)
@@ -171,7 +178,7 @@ namespace MomOi.API.Services.Symptom
 
         public async Task<ApiResponse<object>> GetSymptomEntryByIdAsync(string userId, int id)
         {
-            var entry = await _symptomRepo.FirstOrDefaultAsync(s => s.Id == id && s.UserId == userId);
+            var entry = await _unitOfWork.Repository<SymptomLog>().FirstOrDefaultAsync(s => s.Id == id && s.UserId == userId);
 
             if (entry == null)
                 return ApiResponse<object>.FailureResult("Không tìm thấy bản ghi triệu chứng.");

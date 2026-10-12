@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using MomOi.API.DTOs;
 using MomOi.API.DTOs.Auth;
 using MomOi.API.Services.Auth;
@@ -82,7 +83,8 @@ namespace MomOi.API.Controllers
         [HttpPost("logout")]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
-        public async Task<IActionResult> Logout()
+        public async Task<IActionResult> Logout(
+            [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] LogoutDto? dto)
         {
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
@@ -90,7 +92,7 @@ namespace MomOi.API.Controllers
                 return Unauthorized(ApiResponse<object>.FailureResult("Không tìm thấy thông tin phiên làm việc."));
             }
 
-            await _authService.LogoutAsync(userId);
+            await _authService.LogoutAsync(userId, dto?.RefreshToken);
             return Ok(ApiResponse<object>.SuccessResult(null!, "Đăng xuất thành công."));
         }
     }
