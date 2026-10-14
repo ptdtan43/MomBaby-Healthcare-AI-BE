@@ -95,5 +95,30 @@ namespace MomOi.API.Controllers
             await _authService.LogoutAsync(userId, dto?.RefreshToken);
             return Ok(ApiResponse<object>.SuccessResult(null!, "Đăng xuất thành công."));
         }
+
+        /// <summary>
+        /// Permanently deletes the current account and all of its data (Google Play account
+        /// deletion requirement; Decree 13/2023/ND-CP right to erasure). Payment records are
+        /// kept for accounting but unlinked from the user.
+        /// </summary>
+        [Authorize]
+        [HttpDelete("account")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> DeleteAccount([FromBody] DeleteAccountDto dto)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized(ApiResponse<object>.FailureResult("Không tìm thấy thông tin phiên làm việc."));
+            }
+
+            if (!await _authService.DeleteAccountAsync(userId, dto.Password))
+            {
+                return BadRequest(ApiResponse<object>.FailureResult("Mật khẩu không đúng."));
+            }
+
+            return Ok(ApiResponse<object>.SuccessResult(null!, "Tài khoản và toàn bộ dữ liệu đã được xóa."));
+        }
     }
 }

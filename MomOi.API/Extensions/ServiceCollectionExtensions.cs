@@ -134,6 +134,21 @@ namespace MomOi.API.Extensions
                             context.Token = accessToken;
                         }
                         return System.Threading.Tasks.Task.CompletedTask;
+                    },
+                    // A signature-valid token can outlive its account (deleted) or its access
+                    // (locked by an admin) for up to 15 minutes; reject it as 401 instead of
+                    // letting writes for a missing user fail later with a 500.
+                    OnTokenValidated = async context =>
+                    {
+                        var userId = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                        var userManager = context.HttpContext.RequestServices
+                            .GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<MomOi.API.Models.Identity.AppUser>>();
+                        var user = string.IsNullOrEmpty(userId) ? null : await userManager.FindByIdAsync(userId);
+
+                        if (user == null || (user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTimeOffset.UtcNow))
+                        {
+                            context.Fail("Tài khoản không còn tồn tại hoặc đã bị khóa.");
+                        }
                     }
                 };
             });

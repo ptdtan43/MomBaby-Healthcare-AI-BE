@@ -124,6 +124,13 @@ namespace MomOi.API.Data
                 .HasForeignKey<MomHealthProfile>(m => m.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            // Deleting an account must not delete its payments (accounting retention).
+            builder.Entity<PaymentTransaction>()
+                .HasOne(p => p.User)
+                .WithMany()
+                .HasForeignKey(p => p.UserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             builder.Entity<UserRefreshToken>(e =>
             {
                 e.HasOne(t => t.User)

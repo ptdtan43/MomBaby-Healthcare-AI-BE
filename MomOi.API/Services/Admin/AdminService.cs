@@ -395,7 +395,7 @@ namespace MomOi.API.Services.Admin
             {
                 var keyword = email.Trim().ToLower();
                 query = query.Where(t =>
-                    t.User.Email != null && t.User.Email.ToLower().Contains(keyword));
+                    t.User != null && t.User.Email != null && t.User.Email.ToLower().Contains(keyword));
             }
 
             if (from.HasValue)
@@ -430,8 +430,8 @@ namespace MomOi.API.Services.Admin
                     t.UpdatedAt,
                     t.PaidAt,
                     userId = t.UserId,
-                    userEmail = t.User.Email,
-                    userName = t.User.FullName
+                    userEmail = t.User != null ? t.User.Email : null,
+                    userName = t.User != null ? t.User.FullName : "(Tài khoản đã xóa)"
                 })
                 .ToListAsync();
 

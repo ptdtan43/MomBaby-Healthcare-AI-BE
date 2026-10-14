@@ -27,5 +27,11 @@ namespace MomOi.API.Services.Auth
         /// Revokes the given device's refresh token, or every device's when none is given.
         /// </summary>
         Task LogoutAsync(string userId, string? refreshToken);
+
+        /// <summary>
+        /// Permanently deletes the account and all its data after re-checking the password.
+        /// Returns false when the password is wrong.
+        /// </summary>
+        Task<bool> DeleteAccountAsync(string userId, string password);
     }
 }

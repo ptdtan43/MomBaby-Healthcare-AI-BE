@@ -1774,7 +1774,6 @@ namespace MomOi.API.Migrations
                         .HasColumnName("updated_at");
 
                     b.Property<string>("UserId")
-                        .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("user_id");
 
@@ -2380,8 +2379,7 @@ namespace MomOi.API.Migrations
                     b.HasOne("MomOi.API.Models.Identity.AppUser", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
+                        .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("fk_payment_transactions_users_user_id");
 
                     b.Navigation("User");
