@@ -226,7 +226,7 @@ namespace MomOi.API.Services.Payment
                 return new IpnResult("00", "Confirm Success");
             }
 
-            var user = await _userManager.FindByIdAsync(txn.UserId);
+            var user = txn.UserId is null ? null : await _userManager.FindByIdAsync(txn.UserId);
             if (user == null)
             {
                 txn.Status = PaymentStatus.Failed;

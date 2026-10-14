@@ -13,8 +13,12 @@ namespace MomOi.API.Models.Identity
 
     public class PaymentTransaction : BaseEntity
     {
-        public string UserId { get; set; } = string.Empty;
-        public AppUser User { get; set; } = null!;
+        /// <summary>
+        /// Null once the buyer deleted their account: the transaction is kept, anonymised,
+        /// because accounting records must be retained.
+        /// </summary>
+        public string? UserId { get; set; }
+        public AppUser? User { get; set; }
 
         public SubscriptionTier TargetTier { get; set; }
         public decimal Amount { get; set; }
