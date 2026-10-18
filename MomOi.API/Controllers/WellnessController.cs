@@ -37,6 +37,7 @@ namespace MomOi.API.Controllers
 
         [HttpGet("relax-tracks")]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-        public IActionResult GetRelaxTracks() => Ok(_wellnessService.GetRelaxTracks());
+        public IActionResult GetRelaxTracks() =>
+            Ok(_wellnessService.GetRelaxTracks($"{Request.Scheme}://{Request.Host}{Request.PathBase}"));
     }
 }

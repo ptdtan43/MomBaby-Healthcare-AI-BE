@@ -15,7 +15,10 @@ namespace MomOi.API.Services.Wellness
         /// <summary>Cẩm nang dấu hiệu khẩn cấp. Nội dung tĩnh.</summary>
         ApiResponse<object> GetEmergencyGuide();
 
-        /// <summary>Thư viện âm thanh thư giãn. Nội dung tĩnh.</summary>
-        ApiResponse<object> GetRelaxTracks();
+        /// <summary>
+        /// Thư viện âm thanh thư giãn. <paramref name="requestBaseUrl"/> (vd "https://host")
+        /// dùng để dựng link file nhạc khi chưa cấu hình RelaxAudio:PublicBaseUrl.
+        /// </summary>
+        ApiResponse<object> GetRelaxTracks(string requestBaseUrl);
     }
 }

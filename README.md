@@ -101,6 +101,19 @@ Hệ thống được thiết kế linh hoạt với kiến trúc **Role-Based A
 | `UsdaApiKey` | Kéo dữ liệu dinh dưỡng thực phẩm | USDA FoodData Central |
 | `Payment:MoMo` | Cổng thanh toán (Mock/Real) | MoMo Developer |
 | `Payment:VnPay` | Cổng thanh toán (Mock/Real) | VNPay Sandbox |
+| `RelaxAudio:PublicBaseUrl` | Địa chỉ công khai của API để dựng link nhạc thư giãn (bắt buộc khi deploy sau proxy, vd Railway) | URL của API, vd `https://momoi-api-production.up.railway.app` |
+| `RelaxAudio:Tracks:{id}` | (Tùy chọn) Link nhạc ngoài, vd CDN, ưu tiên hơn file trong `wwwroot/audio` | Nơi lưu file của bạn |
+
+### 🎵 Nhạc thư giãn (`GET /api/wellness/relax-tracks`)
+Đặt file mp3 vào `MomOi.API/wwwroot/audio/`, tên file đúng id bài:
+
+| File | Bài |
+|:---|:---|
+| `piano-lullaby.mp3` | Piano nhẹ cho mẹ nghỉ |
+| `lofi-mom-care.mp3` | Beat nhẹ chăm sóc mẹ |
+| `rain-piano.mp3` | Mưa nhỏ & piano xa |
+
+API phục vụ file tại `/audio/{id}.mp3` và trả link trong `audioUrl`. Bài chưa có file thì `audioUrl = null`: web tự tạo âm thanh, mobile hiện "chưa có âm thanh". Chỉ dùng nhạc có giấy phép cho phép dùng thương mại; app phát hành trên Google Play.
 
 ---
 

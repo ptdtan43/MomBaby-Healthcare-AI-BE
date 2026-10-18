@@ -187,6 +187,7 @@ namespace MomOi.API.Extensions
             services.AddScoped<IMomService, MomService>();
             services.AddScoped<IBusinessRuleEngine, BusinessRuleEngine>();
             services.AddScoped<IWellnessService, WellnessService>();
+            services.AddOptions<RelaxAudioOptions>().BindConfiguration(RelaxAudioOptions.SectionName);
             services.AddScoped<IFeedbackService, FeedbackService>();
 
             // Thanh toán. BindConfiguration tự lấy IConfiguration từ DI nên không cần truyền vào.

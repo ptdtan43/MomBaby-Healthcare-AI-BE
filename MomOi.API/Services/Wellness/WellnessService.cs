@@ -1,5 +1,8 @@
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Options;
 using MomOi.API.DTOs;
 using MomOi.API.Models.Health;
+using MomOi.API.Options;
 using MomOi.API.Repositories;
 using System;
 using System.Collections.Generic;
@@ -14,11 +17,21 @@ namespace MomOi.API.Services.Wellness
     /// </summary>
     public class WellnessService : IWellnessService
     {
-        private readonly IUnitOfWork _unitOfWork;
+        /// <summary>Thư mục trong wwwroot chứa file nhạc, phục vụ tại "/audio/{id}.mp3".</summary>
+        public const string AudioFolder = "audio";
 
-        public WellnessService(IUnitOfWork unitOfWork)
+        private readonly IUnitOfWork _unitOfWork;
+        private readonly RelaxAudioOptions _audioOptions;
+        private readonly IWebHostEnvironment _environment;
+
+        public WellnessService(
+            IUnitOfWork unitOfWork,
+            IOptions<RelaxAudioOptions> audioOptions,
+            IWebHostEnvironment environment)
         {
             _unitOfWork = unitOfWork;
+            _audioOptions = audioOptions.Value;
+            _environment = environment;
         }
 
         public async Task<ApiResponse<object>> GetCareCalendarAsync(string userId)
@@ -87,8 +100,10 @@ namespace MomOi.API.Services.Wellness
             });
         }
 
-        public ApiResponse<object> GetRelaxTracks()
+        public ApiResponse<object> GetRelaxTracks(string requestBaseUrl)
         {
+            string? AudioUrl(string id) => ResolveAudioUrl(id, requestBaseUrl);
+
             var tracks = new List<object>
             {
                 new
@@ -104,7 +119,7 @@ namespace MomOi.API.Services.Wellness
                     chords = new[] { 0, 7, 9, 5 },
                     noise = 0.03,
                     color = "pink",
-                    audioUrl = (string?)null
+                    audioUrl = AudioUrl("piano-lullaby")
                 },
                 new
                 {
@@ -119,7 +134,7 @@ namespace MomOi.API.Services.Wellness
                     chords = new[] { 0, 3, 7, 5 },
                     noise = 0.05,
                     color = "violet",
-                    audioUrl = (string?)null
+                    audioUrl = AudioUrl("lofi-mom-care")
                 },
                 new
                 {
@@ -134,7 +149,7 @@ namespace MomOi.API.Services.Wellness
                     chords = new[] { 0, 5, 9, 7 },
                     noise = 0.16,
                     color = "emerald",
-                    audioUrl = (string?)null
+                    audioUrl = AudioUrl("rain-piano")
                 }
             };
 
@@ -144,6 +159,26 @@ namespace MomOi.API.Services.Wellness
                 description = "Thư viện piano, beat nhẹ và âm thanh thiên nhiên hỗ trợ thư giãn, không thay thế trị liệu y khoa.",
                 tracks
             });
+        }
+
+        /// <summary>
+        /// Link tuyệt đối của file nhạc, hoặc null khi bài chưa có file (web tự tạo âm thanh,
+        /// mobile báo chưa có). Thứ tự: link khai báo trong RelaxAudio:Tracks → wwwroot/audio/{id}.mp3.
+        /// </summary>
+        private string? ResolveAudioUrl(string id, string requestBaseUrl)
+        {
+            if (_audioOptions.Tracks.TryGetValue(id, out var configured) && !string.IsNullOrWhiteSpace(configured))
+                return configured;
+
+            var relativePath = $"{AudioFolder}/{id}.mp3";
+            // WebRootFileProvider vẫn dùng được khi chưa có thư mục wwwroot (trả Exists = false).
+            if (!_environment.WebRootFileProvider.GetFileInfo(relativePath).Exists)
+                return null;
+
+            var baseUrl = string.IsNullOrWhiteSpace(_audioOptions.PublicBaseUrl)
+                ? requestBaseUrl
+                : _audioOptions.PublicBaseUrl;
+            return $"{baseUrl.TrimEnd('/')}/{relativePath}";
         }
     }
 }

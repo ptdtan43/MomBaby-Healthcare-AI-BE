@@ -44,6 +44,8 @@ if (app.Environment.IsDevelopment() || builder.Configuration["EnableSwagger"] ==
 }
 
 app.UseCors("CorsPolicy");
+// File công khai trong wwwroot, hiện là nhạc thư giãn tại /audio/{id}.mp3 (xem WellnessService).
+app.UseStaticFiles();
 app.UseRateLimiter();
 app.UseRouting();
 app.UseAuthentication();
