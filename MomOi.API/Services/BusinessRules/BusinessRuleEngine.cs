@@ -193,6 +193,49 @@ namespace MomOi.API.Services.BusinessRules
 
         #region Mother Rules (BR01 - BR05)
 
+        /// <summary>Từ khoá món cần tránh khi mang thai (BR02), so khớp không phân biệt hoa thường.</summary>
+        private static readonly string[] PregnancyDangerousFoodKeywords =
+            { "sushi", "tái", "gỏi", "rượu", "trà đặc", "dứa", "ổi xanh", "gan sống" };
+
+        /// <summary>Món đầu tiên trong danh sách chứa từ khoá cần tránh, hoặc null.</summary>
+        public static string? FindPregnancyDangerousFood(IEnumerable<string> foods) =>
+            foods.FirstOrDefault(food => !string.IsNullOrWhiteSpace(food)
+                && PregnancyDangerousFoodKeywords.Any(k => food.Contains(k, StringComparison.OrdinalIgnoreCase)));
+
+        // ── BR02 — Gen Z Food Warning (Pregnancy) ──────────────────────────────
+        public async Task<HealthAlert?> EvaluateFoodSafetyAsync(MomHealthProfile profile, IReadOnlyCollection<string> foods)
+        {
+            if (profile.Stage != JourneyStage.Pregnant) return null;
+
+            var detectedFood = FindPregnancyDangerousFood(foods);
+            if (detectedFood == null) return null;
+
+            string warningMessage = "Mami ơi, món ăn có nguy cơ không tốt cho thai kỳ nha. Né gấp nè 💙.";
+            if (_geminiService != null)
+            {
+                try
+                {
+                    warningMessage = await _geminiService.GenerateGenZWarningAsync(detectedFood, profile.PregnancyWeek ?? 1);
+                }
+                catch (Exception ex)
+                {
+                    // Gemini lỗi thì vẫn cảnh báo bằng câu mặc định, không làm hỏng việc ghi bữa ăn.
+                    _logger?.LogWarning(ex, "Không tạo được lời cảnh báo BR02 bằng Gemini cho món {Food}.", detectedFood);
+                }
+            }
+
+            var alert = new HealthAlert(
+                RuleId: "BR02",
+                Severity: AlertSeverity.Critical,
+                TitleVi: "Ét o ét! Món này hổng ổn nha mami 🙅‍♀️",
+                MessageVi: warningMessage,
+                SuggestionVi: "Gợi ý: Tránh đồ ăn sống, tái hoặc cồn. Hãy thay thế bằng một đĩa phở bò chín kỹ thơm ngon nghi ngút khói hoặc cháo tôm chín nhừ mami nhé 💙.",
+                TriggeredAt: DateTime.UtcNow
+            );
+            await LogAlertAndPushAsync(profile.UserId, alert);
+            return alert;
+        }
+
         public async Task<List<HealthAlert>> EvaluateAsync(MomHealthProfile profile)
         {
             var alerts = new List<HealthAlert>();
@@ -223,49 +266,10 @@ namespace MomOi.API.Services.BusinessRules
                 }
             }
 
-            // ── BR02 — Gen Z Food Warning (Pregnancy) ──────────────────────────
-            if (profile.Stage == JourneyStage.Pregnant && _context != null)
-            {
-                var todayMeals = await _context.MealLogs
-                    .Where(m => m.UserId == profile.UserId && m.LoggedAt >= todayStartUtc && m.LoggedAt < tomorrowStartUtc)
-                    .ToListAsync();
-
-                var dangerousKeywords = new[] { "sushi", "tái", "gỏi", "rượu", "trà đặc", "dứa", "ổi xanh", "gan sống" };
-                string? detectedFood = null;
-
-                foreach (var meal in todayMeals)
-                {
-                    foreach (var food in meal.FoodItems)
-                    {
-                        if (dangerousKeywords.Any(k => food.Contains(k, StringComparison.OrdinalIgnoreCase)))
-                        {
-                            detectedFood = food;
-                            break;
-                        }
-                    }
-                    if (detectedFood != null) break;
-                }
-
-                if (detectedFood != null)
-                {
-                    string warningMessage = "Mami ơi, món ăn có nguy cơ không tốt cho thai kỳ nha. Né gấp nè 💙.";
-                    if (_geminiService != null)
-                    {
-                        warningMessage = await _geminiService.GenerateGenZWarningAsync(detectedFood, profile.PregnancyWeek ?? 1);
-                    }
-
-                    var alert = new HealthAlert(
-                        RuleId: "BR02",
-                        Severity: AlertSeverity.Critical,
-                        TitleVi: "Ét o ét! Món này hổng ổn nha mami 🙅‍♀️",
-                        MessageVi: warningMessage,
-                        SuggestionVi: "Gợi ý: Tránh đồ ăn sống, tái hoặc cồn. Hãy thay thế bằng một đĩa phở bò chín kỹ thơm ngon nghi ngút khói hoặc cháo tôm chín nhừ mami nhé 💙.",
-                        TriggeredAt: DateTime.UtcNow
-                    );
-                    alerts.Add(alert);
-                    await LogAlertAndPushAsync(profile.UserId, alert);
-                }
-            }
+            // BR02 (món cần tránh khi mang thai) không chạy ở đây mà trong EvaluateFoodSafetyAsync,
+            // lúc mẹ ghi bữa ăn. Trước kia BR02 quét mọi bữa trong ngày nên một món nguy hiểm
+            // buổi sáng làm mọi lần ghi sau đó (kể cả món an toàn, cân nặng, bài tập) đều báo
+            // lại và gọi Gemini thêm một lần.
 
             // ── BR03 — Exercise Alert (Pregnancy) ──────────────────────────────
             if (profile.Stage == JourneyStage.Pregnant && profile.PregnancyWeek.HasValue && profile.PregnancyWeek <= 36 && _context != null)

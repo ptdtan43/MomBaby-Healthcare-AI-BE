@@ -31,7 +31,8 @@ namespace MomOi.API.Models.Nutrition
         public string[] FoodItems { get; set; } = Array.Empty<string>();
 
         /// <summary>
-        /// Total energy content in kilocalories (kcal).
+        /// Total energy content in kilocalories (kcal). 0 = chưa tính (bữa mẹ tự nhập qua
+        /// /api/pregnancy/food-log chưa được phân tích dinh dưỡng); đừng cộng vào thống kê.
         /// </summary>
         public float Calories { get; set; }
 

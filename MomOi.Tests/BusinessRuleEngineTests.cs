@@ -143,43 +143,122 @@ namespace MomOi.Tests
             Assert.Contains("Cửa sổ thụ thai", alert.TitleVi);
         }
 
+        private static MomHealthProfile PregnantProfile(string userId) => new()
+        {
+            UserId = userId,
+            Stage = JourneyStage.Pregnant,
+            PregnancyWeek = 12
+        };
+
         [Fact]
-        public async Task EvaluateAsync_BR02_PregnancyDangerousFood_TriggersAlert()
+        public async Task EvaluateFoodSafetyAsync_BR02_DangerousFood_TriggersAlert()
         {
             // Arrange
             var options = CreateInMemoryOptions();
             using var context = new AppDbContext(options);
             var (mockGemini, mockHub) = CreateServiceMocks();
-            
-            mockGemini.Setup(g => g.GenerateGenZWarningAsync(It.IsAny<string>(), It.IsAny<int>()))
+
+            mockGemini.Setup(g => g.GenerateGenZWarningAsync("Sushi hồi chín tái", 12))
                 .ReturnsAsync("Mami ơi, ăn sushi hổng ổn tí nào nè!");
 
             var engine = new BusinessRuleEngine(context, mockGemini.Object, mockHub.Object);
 
-            var profile = new MomHealthProfile
-            {
-                UserId = "user-2",
-                Stage = JourneyStage.Pregnant,
-                PregnancyWeek = 12
-            };
+            // Act
+            var alert = await engine.EvaluateFoodSafetyAsync(PregnantProfile("user-2"), new[] { "Trà đá", "Sushi hồi chín tái" });
 
-            // Add dangerous food log today
+            // Assert
+            Assert.NotNull(alert);
+            Assert.Equal("BR02", alert!.RuleId);
+            Assert.Equal(AlertSeverity.Critical, alert.Severity);
+            Assert.Contains("sushi", alert.MessageVi);
+        }
+
+        [Fact]
+        public async Task EvaluateFoodSafetyAsync_BR02_SafeMeal_NoAlertEvenAfterDangerousMealEarlierToday()
+        {
+            // Arrange: sáng đã ghi sushi; bữa trưa an toàn không được bị cảnh báo theo.
+            var options = CreateInMemoryOptions();
+            using var context = new AppDbContext(options);
+            var (mockGemini, mockHub) = CreateServiceMocks();
+            var engine = new BusinessRuleEngine(context, mockGemini.Object, mockHub.Object);
+
             context.MealLogs.Add(new MealLog
             {
-                UserId = "user-2",
-                LoggedAt = DateTime.UtcNow,
-                FoodItems = new[] { "Sushi hồi chín tái", "Trà đá" }
+                UserId = "user-2b",
+                LoggedAt = DateTime.UtcNow.AddHours(-4),
+                FoodItems = new[] { "Sushi cá hồi" }
             });
             await context.SaveChangesAsync();
 
             // Act
-            var alerts = await engine.EvaluateAsync(profile);
+            var alert = await engine.EvaluateFoodSafetyAsync(PregnantProfile("user-2b"), new[] { "Cháo gà", "Canh rau ngót" });
 
             // Assert
-            var alert = alerts.FirstOrDefault(a => a.RuleId == "BR02");
+            Assert.Null(alert);
+            mockGemini.Verify(g => g.GenerateGenZWarningAsync(It.IsAny<string>(), It.IsAny<int>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task EvaluateFoodSafetyAsync_BR02_NotPregnant_NoAlert()
+        {
+            var options = CreateInMemoryOptions();
+            using var context = new AppDbContext(options);
+            var (mockGemini, mockHub) = CreateServiceMocks();
+            var engine = new BusinessRuleEngine(context, mockGemini.Object, mockHub.Object);
+            var profile = new MomHealthProfile { UserId = "user-2c", Stage = JourneyStage.PrePregnancy };
+
+            var alert = await engine.EvaluateFoodSafetyAsync(profile, new[] { "Gỏi cuốn tôm sống" });
+
+            Assert.Null(alert);
+        }
+
+        [Fact]
+        public async Task EvaluateFoodSafetyAsync_BR02_GeminiFails_StillWarnsWithDefaultMessage()
+        {
+            var options = CreateInMemoryOptions();
+            using var context = new AppDbContext(options);
+            var (mockGemini, mockHub) = CreateServiceMocks();
+            mockGemini.Setup(g => g.GenerateGenZWarningAsync(It.IsAny<string>(), It.IsAny<int>()))
+                .ThrowsAsync(new InvalidOperationException("Gemini quota exceeded"));
+            var engine = new BusinessRuleEngine(context, mockGemini.Object, mockHub.Object);
+
+            var alert = await engine.EvaluateFoodSafetyAsync(PregnantProfile("user-2d"), new[] { "Rượu nếp" });
+
             Assert.NotNull(alert);
-            Assert.Equal(AlertSeverity.Critical, alert.Severity);
-            Assert.Contains("sushi", alert.MessageVi);
+            Assert.Contains("không tốt cho thai kỳ", alert!.MessageVi);
+        }
+
+        [Fact]
+        public async Task EvaluateAsync_DoesNotReRaiseBR02FromEarlierMeals()
+        {
+            // EvaluateAsync chạy khi ghi cân nặng, bài tập...; không được báo lại món đã ghi từ trước.
+            var options = CreateInMemoryOptions();
+            using var context = new AppDbContext(options);
+            var (mockGemini, mockHub) = CreateServiceMocks();
+            var engine = new BusinessRuleEngine(context, mockGemini.Object, mockHub.Object);
+
+            context.MealLogs.Add(new MealLog
+            {
+                UserId = "user-2e",
+                LoggedAt = DateTime.UtcNow,
+                FoodItems = new[] { "Sushi hồi chín tái" }
+            });
+            await context.SaveChangesAsync();
+
+            var alerts = await engine.EvaluateAsync(PregnantProfile("user-2e"));
+
+            Assert.DoesNotContain(alerts, a => a.RuleId == "BR02");
+            mockGemini.Verify(g => g.GenerateGenZWarningAsync(It.IsAny<string>(), It.IsAny<int>()), Times.Never);
+        }
+
+        [Theory]
+        [InlineData(new[] { "Cơm", "SUSHI cá hồi" }, "SUSHI cá hồi")]
+        [InlineData(new[] { "Bò tái chanh" }, "Bò tái chanh")]
+        [InlineData(new[] { "Cháo gà", "Sữa chua" }, null)]
+        [InlineData(new[] { "", "  " }, null)]
+        public void FindPregnancyDangerousFood_MatchesKeywordsCaseInsensitive(string[] foods, string? expected)
+        {
+            Assert.Equal(expected, BusinessRuleEngine.FindPregnancyDangerousFood(foods));
         }
 
         [Fact]

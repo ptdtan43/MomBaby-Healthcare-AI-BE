@@ -23,5 +23,8 @@ namespace MomOi.API.Constants
 
         /// <summary>The Vietnamese calendar day an UTC instant falls on.</summary>
         public static DateTime LocalDate(DateTime utcInstant) => utcInstant.Add(Offset).Date;
+
+        /// <summary>Giờ (0-23) theo giờ Việt Nam của một mốc UTC.</summary>
+        public static int LocalHour(DateTime utcInstant) => utcInstant.Add(Offset).Hour;
     }
 }

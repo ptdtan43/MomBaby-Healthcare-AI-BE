@@ -1,4 +1,5 @@
 using MomOi.API.DTOs;
+using MomOi.API.Models;
 using System;
 using System.Threading.Tasks;
 
@@ -8,7 +9,7 @@ namespace MomOi.API.Services.Pregnancy
     {
         Task<ApiResponse<object>> SetupPregnancyAsync(string userId, DateTime lastMenstrualPeriod, DateTime? dueDate);
         Task<ApiResponse<object>> GetThisWeekAsync(string userId);
-        Task<ApiResponse<object>> LogFoodAsync(string userId, string[] foods);
+        Task<ApiResponse<object>> LogFoodAsync(string userId, string[] foods, MealType? mealType = null);
         Task<ApiResponse<object>> GetMealPlanAsync(string userId, int? week);
         Task<ApiResponse<object>> LogWeightAsync(string userId, float weightKg, DateTime date);
         Task<ApiResponse<object>> GetExercisePlanAsync(string userId);

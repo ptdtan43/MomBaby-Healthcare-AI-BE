@@ -65,6 +65,12 @@ namespace MomOi.API.Services.BusinessRules
         Task<List<HealthAlert>> EvaluateAsync(MomHealthProfile profile);
 
         /// <summary>
+        /// BR02: kiểm tra đúng các món của bữa vừa ghi có món cần tránh khi mang thai không.
+        /// Trả về cảnh báo (đã ghi log và đẩy thông báo) hoặc null nếu an toàn / không mang thai.
+        /// </summary>
+        Task<HealthAlert?> EvaluateFoodSafetyAsync(MomHealthProfile profile, IReadOnlyCollection<string> foods);
+
+        /// <summary>
         /// Evaluates baby growth, nutrition, and developmental rules (BR06 - BR10).
         /// </summary>
         Task<List<HealthAlert>> EvaluateBabyAsync(BabyProfile baby, BabyFoodLog todayLog);

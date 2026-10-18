@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using MomOi.API.DTOs;
 using MomOi.API.Middleware;
+using MomOi.API.Models;
 using MomOi.API.Models.Identity;
 using MomOi.API.Services.Pregnancy;
 using System;
@@ -64,6 +65,9 @@ namespace MomOi.API.Controllers
         public class FoodLogRequest
         {
             public string[] Foods { get; set; } = Array.Empty<string>();
+
+            /// <summary>Bữa nào (Breakfast/Lunch/Dinner/Snack). Bỏ trống thì suy theo giờ Việt Nam.</summary>
+            public MealType? MealType { get; set; }
         }
 
         /// <summary>
@@ -77,7 +81,7 @@ namespace MomOi.API.Controllers
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId)) return Unauthorized();
 
-            var response = await _pregnancyService.LogFoodAsync(userId, request.Foods);
+            var response = await _pregnancyService.LogFoodAsync(userId, request.Foods, request.MealType);
             return response.Success ? Ok(response) : BadRequest(response);
         }
 

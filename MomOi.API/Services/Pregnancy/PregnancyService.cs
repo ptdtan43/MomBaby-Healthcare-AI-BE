@@ -97,24 +97,47 @@ namespace MomOi.API.Services.Pregnancy
             return ApiResponse<object>.SuccessResult(milestoneData);
         }
 
-        public async Task<ApiResponse<object>> LogFoodAsync(string userId, string[] foods)
+        /// <summary>
+        /// Bữa theo giờ Việt Nam khi client không gửi: 4-10h sáng, 10-14h trưa, 17-21h tối, còn lại là bữa phụ.
+        /// </summary>
+        public static MealType InferMealType(DateTime utcInstant)
+        {
+            var hour = VietnamTime.LocalHour(utcInstant);
+            if (hour >= 4 && hour < 10) return MealType.Breakfast;
+            if (hour >= 10 && hour < 14) return MealType.Lunch;
+            if (hour >= 17 && hour < 21) return MealType.Dinner;
+            return MealType.Snack;
+        }
+
+        public async Task<ApiResponse<object>> LogFoodAsync(string userId, string[] foods, MealType? mealType = null)
         {
             var profile = await _unitOfWork.Repository<MomHealthProfile>().FirstOrDefaultAsync(p => p.UserId == userId);
             if (profile == null) return ApiResponse<object>.FailureResult("Hồ sơ sức khỏe không tồn tại.");
 
+            var foodItems = (foods ?? Array.Empty<string>())
+                .Select(f => f?.Trim() ?? string.Empty)
+                .Where(f => f.Length > 0)
+                .ToArray();
+            if (foodItems.Length == 0)
+                return ApiResponse<object>.FailureResult("Vui lòng nhập ít nhất một món ăn.");
+
+            var loggedAt = DateTime.UtcNow;
             var mealLog = new MealLog
             {
                 UserId = userId,
-                LoggedAt = DateTime.UtcNow,
-                MealType = MealType.Snack,
-                FoodItems = foods,
-                Calories = 250f
+                LoggedAt = loggedAt,
+                MealType = mealType ?? InferMealType(loggedAt),
+                FoodItems = foodItems,
+                // Chưa có nguồn tính dinh dưỡng cho món mẹ tự nhập: để 0 (= chưa tính) như
+                // Protein/Carbs/Fat, không ghi con số ước đoán.
+                Calories = 0f
             };
             await _unitOfWork.Repository<MealLog>().AddAsync(mealLog);
             await _unitOfWork.SaveChangesAsync();
 
-            var alerts = await _ruleEngine.EvaluateAsync(profile);
-            var br02Alerts = alerts.Where(a => a.RuleId == "BR02").ToList();
+            // Chỉ kiểm tra bữa vừa ghi; các bữa trước trong ngày không làm bữa này bị cảnh báo.
+            var foodAlert = await _ruleEngine.EvaluateFoodSafetyAsync(profile, foodItems);
+            var br02Alerts = foodAlert == null ? new List<HealthAlert>() : new List<HealthAlert> { foodAlert };
 
             var safeAlternatives = new List<string>();
             if (br02Alerts.Any())
@@ -135,7 +158,20 @@ namespace MomOi.API.Services.Pregnancy
 
         public async Task<ApiResponse<object>> GetMealPlanAsync(string userId, int? week)
         {
-            int selectedWeek = week ?? 12;
+            // Client không gửi tuần thì lấy tuần thật của mẹ (mobile không gửi), không mặc định một tuần cố định.
+            int? selectedWeekOrNull = week;
+            if (!selectedWeekOrNull.HasValue)
+            {
+                var profile = await _unitOfWork.Repository<MomHealthProfile>()
+                    .FirstOrDefaultAsync(p => p.UserId == userId, asNoTracking: true);
+                selectedWeekOrNull = profile == null ? null : ResolvePregnancyWeek(profile);
+            }
+            if (!selectedWeekOrNull.HasValue)
+            {
+                return ApiResponse<object>.FailureResult(
+                    "Vui lòng cập nhật tuần thai hoặc ngày kinh cuối trong hồ sơ để xem thực đơn phù hợp.");
+            }
+            int selectedWeek = Math.Clamp(selectedWeekOrNull.Value, 1, 42);
 
             // The 7-day plan (dishes + USDA-computed nutrient totals) comes from the
             // Python nutrition engine. No hardcoded fallback: if the service is down
@@ -156,10 +192,18 @@ namespace MomOi.API.Services.Pregnancy
             var profile = await _unitOfWork.Repository<MomHealthProfile>().FirstOrDefaultAsync(p => p.UserId == userId);
             if (profile == null) return ApiResponse<object>.FailureResult("Hồ sơ sức khỏe không tồn tại.");
 
+            // Tuần thai lấy từ hồ sơ hoặc ngày kinh cuối, không ghi một tuần mặc định.
+            var week = ResolvePregnancyWeek(profile);
+            if (!week.HasValue)
+            {
+                return ApiResponse<object>.FailureResult(
+                    "Vui lòng cập nhật tuần thai hoặc ngày kinh cuối trong hồ sơ trước khi ghi cân nặng.");
+            }
+
             var pregnancyLog = new PregnancyLog
             {
                 UserId = userId,
-                Week = profile.PregnancyWeek ?? 12,
+                Week = week.Value,
                 Weight = weightKg,
                 RecordedAt = date
             };

@@ -180,8 +180,21 @@ namespace MomOi.API.Services.Postpartum
 
         public async Task<ApiResponse<object>> GetRecoveryPlanAsync(string userId, int? day)
         {
-            await Task.CompletedTask;
-            int targetDay = day ?? 14;
+            // Client không gửi ngày thì tính từ ngày sinh trong hồ sơ, không mặc định một ngày cố định.
+            int? resolvedDay = day;
+            if (!resolvedDay.HasValue)
+            {
+                var profile = await _unitOfWork.Repository<MomHealthProfile>()
+                    .FirstOrDefaultAsync(p => p.UserId == userId, asNoTracking: true);
+                if (profile?.DeliveryDate is DateTime deliveryDate)
+                    resolvedDay = Math.Max(1, (VietnamTime.Today - deliveryDate.Date).Days + 1);
+            }
+            if (!resolvedDay.HasValue)
+            {
+                return ApiResponse<object>.FailureResult(
+                    "Vui lòng cập nhật ngày sinh bé trong hồ sơ để xem kế hoạch hồi phục phù hợp.");
+            }
+            int targetDay = resolvedDay.Value;
 
             object exerciseSchedule;
             if (targetDay <= 7)

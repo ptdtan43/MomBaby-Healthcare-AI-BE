@@ -236,11 +236,9 @@ namespace MomOi.API.Services.AI
 
         public async Task<string> GenerateAiDietRecipeAsync(string query)
         {
+            // Không trả món mẫu: món giả sẽ hiện ra cho mẹ như gợi ý thật. Báo lỗi để caller trả thông báo rõ ràng.
             if (string.IsNullOrEmpty(_apiKey))
-            {
-                _logger.LogWarning("Gemini API key is not configured. Returning mock diet recipe.");
-                return "{ \"recipe\": \"Món Ăn Thử Nghiệm\", \"calories\": 300, \"ingredients\": [\"Nguyên liệu 1\", \"Nguyên liệu 2\"], \"steps\": [\"Bước 1\", \"Bước 2\"] }";
-            }
+                throw new InvalidOperationException("Gemini API key is not configured (GEMINI_API_KEY).");
 
             try
             {
@@ -253,17 +251,15 @@ namespace MomOi.API.Services.AI
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error in GenerateAiDietRecipeAsync.");
-                return "{ \"recipe\": \"Lỗi Sinh Món Ăn\", \"calories\": 0, \"ingredients\": [], \"steps\": [] }";
+                throw;
             }
         }
 
         public async Task<string> GenerateMultiAiDietRecipesAsync(string query)
         {
+            // Không trả món mẫu: AIFeatureService lưu kết quả thành công thức chờ chuyên gia duyệt.
             if (string.IsNullOrEmpty(_apiKey))
-            {
-                _logger.LogWarning("Gemini API key is not configured. Returning mock diet recipes.");
-                return "[{ \"recipe\": \"Món Ăn Thử Nghiệm 1\", \"calories\": 300, \"ingredients\": [\"Nguyên liệu 1\"], \"steps\": [\"Bước 1\"] }]";
-            }
+                throw new InvalidOperationException("Gemini API key is not configured (GEMINI_API_KEY).");
 
             try
             {
@@ -303,8 +299,9 @@ Trả về ĐÚNG MỘT khối JSON MẢNG (Array) hợp lệ:
             }
             catch (Exception ex)
             {
+                // Trả "[]" trước kia bị hiểu là "thành công, 0 món"; để lỗi nổi lên cho caller báo thật.
                 _logger.LogError(ex, "Error in GenerateMultiAiDietRecipesAsync.");
-                return "[]";
+                throw;
             }
         }
 
