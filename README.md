@@ -113,6 +113,8 @@ Hệ thống được thiết kế linh hoạt với kiến trúc **Role-Based A
 | `lofi-mom-care.mp3` | Beat nhẹ chăm sóc mẹ |
 | `rain-piano.mp3` | Mưa nhỏ & piano xa |
 
+Ba file hiện có được tổng hợp hoàn toàn bằng code (không dùng bản ghi của ai), theo đúng thông số từng bài trong `WellnessService`: `scripts/relax-audio/make_relax_tracks.py` (cần `pip install numpy lameenc`, chạy `python make_relax_tracks.py MomOi.API/wwwroot/audio`).
+
 API phục vụ file tại `/audio/{id}.mp3` và trả link trong `audioUrl`. Bài chưa có file thì `audioUrl = null`: web tự tạo âm thanh, mobile hiện "chưa có âm thanh". Chỉ dùng nhạc có giấy phép cho phép dùng thương mại; app phát hành trên Google Play.
 
 ---
