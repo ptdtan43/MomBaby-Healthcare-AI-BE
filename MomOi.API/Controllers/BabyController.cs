@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using MomOi.API.DTOs;
+using MomOi.API.DTOs.Baby;
 using MomOi.API.Middleware;
 using MomOi.API.Models.Health;
 using MomOi.API.Models.Identity;
@@ -127,6 +128,47 @@ namespace MomOi.API.Controllers
 
             var response = await _babyService.UpdateBabyProfileAsync(userId, id, profile);
             return response.Success ? Ok(response) : BadRequest(response);
+        }
+
+        [HttpPost("{id}/photo")]
+        [RequestSizeLimit(5 * 1024 * 1024)]
+        [Consumes("multipart/form-data")]
+        [ProducesResponseType(typeof(ApiResponse<BabyPhotoDto>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> UploadBabyPhoto(int id, [FromForm(Name = "file")] IFormFile file)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            var response = await _babyService.UploadBabyPhotoAsync(userId, id, file);
+            return response.Success ? Ok(response) : BadRequest(response);
+        }
+
+        [HttpGet("{id}/photo")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<BabyPhotoDto>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetBabyPhoto(int id)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            var result = await _babyService.GetBabyPhotoAsync(userId, id);
+            if (!result.Response.Success || result.Content == null)
+            {
+                return NotFound(result.Response);
+            }
+
+            return File(result.Content, result.Response.Data!.ContentType);
+        }
+
+        [HttpDelete("{id}/photo")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> DeleteBabyPhoto(int id)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            var response = await _babyService.DeleteBabyPhotoAsync(userId, id);
+            return response.Success ? Ok(response) : NotFound(response);
         }
 
     }

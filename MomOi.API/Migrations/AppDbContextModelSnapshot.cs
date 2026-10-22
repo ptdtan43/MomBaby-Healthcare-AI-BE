@@ -230,6 +230,18 @@ namespace MomOi.API.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("gender");
 
+                    b.Property<string>("PhotoContentType")
+                        .HasColumnType("text")
+                        .HasColumnName("photo_content_type");
+
+                    b.Property<string>("PhotoStorageKey")
+                        .HasColumnType("text")
+                        .HasColumnName("photo_storage_key");
+
+                    b.Property<DateTime?>("PhotoUpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("photo_updated_at");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");

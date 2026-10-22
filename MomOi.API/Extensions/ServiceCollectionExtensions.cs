@@ -26,6 +26,7 @@ using MomOi.API.Services.Diet;
 using MomOi.API.Services.Expert;
 using MomOi.API.Services.Feedback;
 using MomOi.API.Services.Fertility;
+using MomOi.API.Services.FileStorage;
 using MomOi.API.Services.Integration;
 using MomOi.API.Services.Lifestyle;
 using MomOi.API.Services.Medication;
@@ -160,6 +161,9 @@ namespace MomOi.API.Extensions
 
         public static IServiceCollection AddApplicationServices(this IServiceCollection services)
         {
+            services.AddOptions<FileStorageOptions>().BindConfiguration(FileStorageOptions.SectionName);
+            services.AddSingleton<IFileStorage, LocalFileStorage>();
+
             // Repository layer
             services.AddScoped<IUnitOfWork, UnitOfWork>();
             // Giữ lại IGenericRepository để tương thích ngược nếu có nơi nào dùng trực tiếp

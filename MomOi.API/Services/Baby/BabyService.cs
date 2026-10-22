@@ -1,8 +1,14 @@
 using MomOi.API.DTOs;
+using MomOi.API.DTOs.Baby;
 using MomOi.API.Models;
 using MomOi.API.Models.Health;
+using MomOi.API.Options;
 using MomOi.API.Repositories;
 using MomOi.API.Services.BusinessRules;
+using MomOi.API.Services.FileStorage;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Options;
+using System.IO;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,15 +21,21 @@ namespace MomOi.API.Services.Baby
         private readonly IUnitOfWork _unitOfWork;
         private readonly IBusinessRuleEngine _businessRuleEngine;
         private readonly Nutrition.NutritionProxyService _nutritionProxy;
+        private readonly IFileStorage _fileStorage;
+        private readonly FileStorageOptions _fileStorageOptions;
 
         public BabyService(
             IUnitOfWork unitOfWork,
             IBusinessRuleEngine businessRuleEngine,
-            Nutrition.NutritionProxyService nutritionProxy)
+            Nutrition.NutritionProxyService nutritionProxy,
+            IFileStorage fileStorage,
+            IOptions<FileStorageOptions> fileStorageOptions)
         {
             _unitOfWork = unitOfWork;
             _businessRuleEngine = businessRuleEngine;
             _nutritionProxy = nutritionProxy;
+            _fileStorage = fileStorage;
+            _fileStorageOptions = fileStorageOptions.Value;
         }
 
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, object> _dailyMenuCache = new();
@@ -313,6 +325,167 @@ namespace MomOi.API.Services.Baby
             _dailyMenuCache.TryRemove($"weekly_{userId}_{id}_{todayStr}", out _);
 
             return ApiResponse<BabyProfile>.SuccessResult(existing, "Cập nhật hồ sơ bé thành công.");
+        }
+
+        public async Task<ApiResponse<BabyPhotoDto>> UploadBabyPhotoAsync(string userId, int babyId, IFormFile file)
+        {
+            var baby = await _unitOfWork.Repository<BabyProfile>().FirstOrDefaultAsync(b => b.Id == babyId && b.UserId == userId);
+            if (baby == null)
+            {
+                return ApiResponse<BabyPhotoDto>.FailureResult(
+                    "Không tìm thấy hồ sơ của bé.", errorCode: "BABY_NOT_FOUND");
+            }
+
+            if (file == null || file.Length == 0)
+            {
+                return ApiResponse<BabyPhotoDto>.FailureResult(
+                    "Vui lòng chọn ảnh để tải lên.", errorCode: "PHOTO_REQUIRED");
+            }
+
+            if (file.Length > _fileStorageOptions.MaxPhotoSizeBytes)
+            {
+                return ApiResponse<BabyPhotoDto>.FailureResult(
+                    $"Ảnh không được vượt quá {_fileStorageOptions.MaxPhotoSizeBytes / (1024 * 1024)} MB.",
+                    errorCode: "PHOTO_TOO_LARGE");
+            }
+
+            var contentType = await DetectPhotoContentTypeAsync(file);
+            if (contentType == null)
+            {
+                return ApiResponse<BabyPhotoDto>.FailureResult(
+                    "Chỉ chấp nhận ảnh JPEG, PNG hoặc WebP.", errorCode: "PHOTO_TYPE_NOT_SUPPORTED");
+            }
+
+            var newStorageKey = $"baby-photo-{Guid.NewGuid():N}";
+            var committed = false;
+            try
+            {
+                await using (var input = file.OpenReadStream())
+                {
+                    await _fileStorage.SaveAsync(newStorageKey, input);
+                }
+
+                var oldStorageKey = baby.PhotoStorageKey;
+                baby.PhotoStorageKey = newStorageKey;
+                baby.PhotoContentType = contentType;
+                baby.PhotoUpdatedAt = DateTime.UtcNow;
+                _unitOfWork.Repository<BabyProfile>().Update(baby);
+                await _unitOfWork.SaveChangesAsync();
+                committed = true;
+
+                if (!string.IsNullOrEmpty(oldStorageKey))
+                {
+                    await _fileStorage.DeleteAsync(oldStorageKey);
+                }
+
+                return ApiResponse<BabyPhotoDto>.SuccessResult(
+                    new BabyPhotoDto
+                    {
+                        HasPhoto = true,
+                        ContentType = contentType,
+                        UpdatedAt = baby.PhotoUpdatedAt
+                    },
+                    "Tải ảnh đại diện cho bé thành công.");
+            }
+            finally
+            {
+                if (!committed)
+                {
+                    await _fileStorage.DeleteAsync(newStorageKey);
+                }
+            }
+        }
+
+        public async Task<BabyPhotoDownload> GetBabyPhotoAsync(string userId, int babyId)
+        {
+            var baby = await _unitOfWork.Repository<BabyProfile>().FirstOrDefaultAsync(b => b.Id == babyId && b.UserId == userId);
+            if (baby == null)
+            {
+                return new BabyPhotoDownload
+                {
+                    Response = ApiResponse<BabyPhotoDto>.FailureResult(
+                        "Không tìm thấy hồ sơ của bé.", errorCode: "BABY_NOT_FOUND")
+                };
+            }
+
+            if (string.IsNullOrEmpty(baby.PhotoStorageKey) || string.IsNullOrEmpty(baby.PhotoContentType))
+            {
+                return new BabyPhotoDownload
+                {
+                    Response = ApiResponse<BabyPhotoDto>.FailureResult(
+                        "Bé chưa có ảnh đại diện.", errorCode: "PHOTO_NOT_FOUND")
+                };
+            }
+
+            var content = await _fileStorage.OpenReadAsync(baby.PhotoStorageKey);
+            if (content == null)
+            {
+                return new BabyPhotoDownload
+                {
+                    Response = ApiResponse<BabyPhotoDto>.FailureResult(
+                        "Không tìm thấy tệp ảnh của bé.", errorCode: "PHOTO_NOT_FOUND")
+                };
+            }
+
+            return new BabyPhotoDownload
+            {
+                Content = content,
+                Response = ApiResponse<BabyPhotoDto>.SuccessResult(
+                    new BabyPhotoDto
+                    {
+                        HasPhoto = true,
+                        ContentType = baby.PhotoContentType,
+                        UpdatedAt = baby.PhotoUpdatedAt
+                    })
+            };
+        }
+
+        public async Task<ApiResponse<object>> DeleteBabyPhotoAsync(string userId, int babyId)
+        {
+            var baby = await _unitOfWork.Repository<BabyProfile>().FirstOrDefaultAsync(b => b.Id == babyId && b.UserId == userId);
+            if (baby == null)
+            {
+                return ApiResponse<object>.FailureResult(
+                    "Không tìm thấy hồ sơ của bé.", errorCode: "BABY_NOT_FOUND");
+            }
+
+            if (string.IsNullOrEmpty(baby.PhotoStorageKey))
+            {
+                return ApiResponse<object>.FailureResult(
+                    "Bé chưa có ảnh đại diện.", errorCode: "PHOTO_NOT_FOUND");
+            }
+
+            var oldStorageKey = baby.PhotoStorageKey;
+            baby.PhotoStorageKey = null;
+            baby.PhotoContentType = null;
+            baby.PhotoUpdatedAt = null;
+            _unitOfWork.Repository<BabyProfile>().Update(baby);
+            await _unitOfWork.SaveChangesAsync();
+            await _fileStorage.DeleteAsync(oldStorageKey);
+
+            return ApiResponse<object>.SuccessResult(null!, "Xóa ảnh đại diện của bé thành công.");
+        }
+
+        private static async Task<string?> DetectPhotoContentTypeAsync(IFormFile file)
+        {
+            var header = new byte[12];
+            await using var stream = file.OpenReadStream();
+            var read = await stream.ReadAsync(header.AsMemory(0, header.Length));
+
+            if (read >= 3 && header[0] == 0xFF && header[1] == 0xD8 && header[2] == 0xFF)
+                return "image/jpeg";
+
+            if (read >= 8 &&
+                header[0] == 0x89 && header[1] == 0x50 && header[2] == 0x4E && header[3] == 0x47 &&
+                header[4] == 0x0D && header[5] == 0x0A && header[6] == 0x1A && header[7] == 0x0A)
+                return "image/png";
+
+            if (read >= 12 &&
+                header[0] == 0x52 && header[1] == 0x49 && header[2] == 0x46 && header[3] == 0x46 &&
+                header[8] == 0x57 && header[9] == 0x45 && header[10] == 0x42 && header[11] == 0x50)
+                return "image/webp";
+
+            return null;
         }
     }
 }
