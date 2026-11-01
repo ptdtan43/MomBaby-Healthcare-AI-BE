@@ -196,6 +196,32 @@ namespace MomOi.API.Services.Auth
             await _unitOfWork.SaveChangesAsync();
         }
 
+        public async Task<UserResponseDto> UpdateNameAsync(string userId, string fullName)
+        {
+            var user = await _userManager.FindByIdAsync(userId)
+                ?? throw new UnauthorizedAccessException("Không tìm thấy tài khoản.");
+
+            user.FullName = fullName.Trim();
+            var result = await _userManager.UpdateAsync(user);
+            if (!result.Succeeded)
+            {
+                var errors = string.Join("; ", result.Errors.Select(e => e.Description));
+                throw new InvalidOperationException($"Cập nhật họ tên thất bại: {errors}");
+            }
+
+            // The "fullname" claim in existing access tokens stays stale until the next refresh;
+            // clients take the name from this response instead.
+            return new UserResponseDto
+            {
+                Id = user.Id,
+                Email = user.Email!,
+                FullName = user.FullName,
+                Tier = user.EffectiveTier,
+                TierExpiresAt = user.TierExpiresAt,
+                Roles = await _userManager.GetRolesAsync(user)
+            };
+        }
+
         public async Task<bool> DeleteAccountAsync(string userId, string password)
         {
             var user = await _userManager.FindByIdAsync(userId)

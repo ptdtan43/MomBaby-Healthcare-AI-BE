@@ -33,5 +33,10 @@ namespace MomOi.API.Services.Auth
         /// Returns false when the password is wrong.
         /// </summary>
         Task<bool> DeleteAccountAsync(string userId, string password);
+
+        /// <summary>
+        /// Changes the user's display name and returns the updated user details.
+        /// </summary>
+        Task<UserResponseDto> UpdateNameAsync(string userId, string fullName);
     }
 }

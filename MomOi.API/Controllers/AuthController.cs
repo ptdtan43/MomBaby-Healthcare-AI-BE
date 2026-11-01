@@ -97,6 +97,30 @@ namespace MomOi.API.Controllers
         }
 
         /// <summary>
+        /// Changes the display name of the signed-in user.
+        /// </summary>
+        [Authorize]
+        [HttpPut("name")]
+        [ProducesResponseType(typeof(ApiResponse<UserResponseDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> UpdateName([FromBody] UpdateNameDto dto)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized(ApiResponse<object>.FailureResult("Không tìm thấy thông tin phiên làm việc."));
+            }
+
+            if (!ModelState.IsValid || string.IsNullOrWhiteSpace(dto.FullName))
+            {
+                return BadRequest(ApiResponse<object>.FailureResult("Họ và tên không hợp lệ."));
+            }
+
+            var result = await _authService.UpdateNameAsync(userId, dto.FullName);
+            return Ok(ApiResponse<UserResponseDto>.SuccessResult(result, "Đã cập nhật họ và tên."));
+        }
+
+        /// <summary>
         /// Permanently deletes the current account and all of its data (Google Play account
         /// deletion requirement; Decree 13/2023/ND-CP right to erasure). Payment records are
         /// kept for accounting but unlinked from the user.
