@@ -21,6 +21,10 @@ services:
       # tài khoản, thay vì dùng mật khẩu mặc định (xem Data/DbInitializer.cs).
       - Seed__AdminPassword=${SEED_ADMIN_PASSWORD}
       - EnableSwagger=true
+      - FileStorage__RootPath=/app/uploads
+      - FileStorage__MaxPhotoSizeBytes=5242880
+    volumes:
+      - baby_uploads:/app/uploads
     depends_on:
       - pgdb
 
@@ -53,3 +57,4 @@ services:
 
 volumes:
   pgdb_data:
+  baby_uploads:

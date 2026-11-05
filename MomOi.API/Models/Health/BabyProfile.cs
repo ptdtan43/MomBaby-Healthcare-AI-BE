@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace MomOi.API.Models.Health
 {
@@ -52,6 +54,18 @@ namespace MomOi.API.Models.Health
         /// Feeding/food introduction history, serialized as JSON.
         /// </summary>
         public string[] FoodHistory { get; set; } = Array.Empty<string>();
+
+        [JsonIgnore]
+        public string? PhotoStorageKey { get; set; }
+
+        [JsonIgnore]
+        public string? PhotoContentType { get; set; }
+
+        [JsonIgnore]
+        public DateTime? PhotoUpdatedAt { get; set; }
+
+        [NotMapped]
+        public bool HasPhoto => !string.IsNullOrEmpty(PhotoStorageKey);
 
         /// <summary>
         /// Navigation collection for growth logs over time.
