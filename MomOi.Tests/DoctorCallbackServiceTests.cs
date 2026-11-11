@@ -5,6 +5,7 @@ using Moq;
 using MomOi.API.Constants;
 using MomOi.API.Data;
 using MomOi.API.DTOs.DoctorCallback;
+using MomOi.API.Models;
 using MomOi.API.Models.Health;
 using MomOi.API.Models.Identity;
 using MomOi.API.Repositories;
@@ -136,6 +137,54 @@ public class DoctorCallbackServiceTests
         var response = await service.CancelAsync("mom-1", db.DoctorCallbackRequests.Single().Id);
 
         Assert.Equal("CALLBACK_NOT_FOUND", response.ErrorCode);
+    }
+
+    [Fact]
+    public async Task CreateRejectsSymptomLogOwnedByAnotherMom()
+    {
+        var (service, db) = CreateService(SubscriptionTier.SuperMomVip);
+        db.SymptomLogs.Add(new SymptomLog { UserId = "mom-2", TextDescription = "Của mẹ khác" });
+        await db.SaveChangesAsync();
+
+        var response = await service.CreateAsync("mom-1", new CreateDoctorCallbackDto
+        {
+            ContactPhone = ValidRequest.ContactPhone,
+            Concern = ValidRequest.Concern,
+            SymptomLogId = db.SymptomLogs.Single().Id
+        });
+
+        Assert.Equal("SYMPTOM_NOT_FOUND", response.ErrorCode);
+        Assert.Empty(db.DoctorCallbackRequests);
+    }
+
+    [Fact]
+    public async Task QueueShowsAttachedSymptomPhotoForPendingRequest()
+    {
+        var (service, db) = CreateService(SubscriptionTier.SuperMomVip);
+        db.SymptomLogs.Add(new SymptomLog
+        {
+            UserId = "mom-1",
+            TextDescription = "Bé nổi mẩn đỏ ở má",
+            ImageUrl = "data:image/jpeg;base64,AAAA",
+            UrgencyLevel = UrgencyLevel.Medium
+        });
+        await db.SaveChangesAsync();
+
+        var created = await service.CreateAsync("mom-1", new CreateDoctorCallbackDto
+        {
+            ContactPhone = ValidRequest.ContactPhone,
+            Concern = ValidRequest.Concern,
+            SymptomLogId = db.SymptomLogs.Single().Id
+        });
+        Assert.True(created.Success);
+
+        var queue = await service.GetQueueAsync();
+
+        var item = Assert.Single(queue.Data!);
+        Assert.NotNull(item.Symptom);
+        Assert.Equal("data:image/jpeg;base64,AAAA", item.Symptom!.ImageUrl);
+        Assert.Equal("Bé nổi mẩn đỏ ở má", item.Symptom.TextDescription);
+        Assert.Equal("Mẹ Test", item.MomName);
     }
 
     private static (DoctorCallbackService Service, AppDbContext Db) CreateService(SubscriptionTier tier)

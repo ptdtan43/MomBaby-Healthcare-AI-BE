@@ -16,6 +16,24 @@ namespace MomOi.API.DTOs.DoctorCallback
 
         [MaxLength(100)]
         public string? PreferredTime { get; set; }
+
+        /// <summary>Lần kiểm tra triệu chứng muốn đính kèm (phải thuộc về chính mẹ).</summary>
+        public int? SymptomLogId { get; set; }
+    }
+
+    /// <summary>Tóm tắt lần kiểm tra triệu chứng đính kèm, để bác sĩ xem trước khi gọi.</summary>
+    public class AttachedSymptomDto
+    {
+        public int Id { get; set; }
+        public string TextDescription { get; set; } = string.Empty;
+        /// <summary>Ảnh mẹ chụp (data URL hoặc đường dẫn), null nếu không có ảnh.</summary>
+        public string? ImageUrl { get; set; }
+        public string? UrgencyLevel { get; set; }
+        public bool ShouldSeeDoctor { get; set; }
+        public string? SpecialistType { get; set; }
+        /// <summary>JSON kết quả AI (cùng định dạng /api/symptoms) để FE hiển thị các khả năng.</summary>
+        public string? AnalysisJson { get; set; }
+        public DateTime CreatedAt { get; set; }
     }
 
     public class ResolveDoctorCallbackDto
@@ -36,6 +54,7 @@ namespace MomOi.API.DTOs.DoctorCallback
         public bool FeeDue { get; set; }
         public DateTime? FeePaidAt { get; set; }
         public string? FeeOrderCode { get; set; }
+        public int? SymptomLogId { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime? HandledAt { get; set; }
     }
@@ -46,5 +65,7 @@ namespace MomOi.API.DTOs.DoctorCallback
         public string MomName { get; set; } = string.Empty;
         public string? MomEmail { get; set; }
         public string? DoctorNote { get; set; }
+        /// <summary>Chỉ có với yêu cầu đang chờ, để hàng đợi không phải tải ảnh của các yêu cầu cũ.</summary>
+        public AttachedSymptomDto? Symptom { get; set; }
     }
 }
