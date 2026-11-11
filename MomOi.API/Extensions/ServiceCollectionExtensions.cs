@@ -23,6 +23,7 @@ using MomOi.API.Services.BusinessRules;
 using MomOi.API.Services.DailyMonitoring;
 using MomOi.API.Services.Dashboard;
 using MomOi.API.Services.Diet;
+using MomOi.API.Services.DoctorCallback;
 using MomOi.API.Services.Expert;
 using MomOi.API.Services.Feedback;
 using MomOi.API.Services.Fertility;
@@ -206,6 +207,7 @@ namespace MomOi.API.Extensions
             services.AddScoped<IPaymentGateway>(sp => sp.GetRequiredService<VnPayGateway>());
             services.AddScoped<IPaymentGateway>(sp => sp.GetRequiredService<MoMoGateway>());
             services.AddScoped<IPaymentService, PaymentService>();
+            services.AddScoped<IDoctorCallbackService, DoctorCallbackService>();
 
             // External API clients
             services.AddHttpClient<IUsdaClientService, UsdaClientService>();

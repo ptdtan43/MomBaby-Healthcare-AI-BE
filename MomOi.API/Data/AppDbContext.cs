@@ -71,6 +71,8 @@ namespace MomOi.API.Data
 
         public DbSet<UserRefreshToken> UserRefreshTokens { get; set; } = null!;
 
+        public DbSet<DoctorCallbackRequest> DoctorCallbackRequests { get; set; } = null!;
+
         public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
             // ── Bước 1: chuyển lệnh XOÁ thành lệnh CẬP NHẬT cờ, với entity có xoá mềm.
@@ -209,6 +211,20 @@ namespace MomOi.API.Data
             // Mã đơn phải duy nhất: cổng thanh toán dùng nó làm khoá đối chiếu, và IPN
             // tra cứu theo mã này nên trùng mã là ghi nhận nhầm giao dịch.
             builder.Entity<PaymentTransaction>().HasIndex(p => p.OrderCode).IsUnique();
+
+            builder.Entity<DoctorCallbackRequest>(e =>
+            {
+                e.HasOne(r => r.User).WithMany().HasForeignKey(r => r.UserId).OnDelete(DeleteBehavior.Cascade);
+                e.Property(r => r.ContactPhone).HasMaxLength(20);
+                e.Property(r => r.Concern).HasMaxLength(1000);
+                e.Property(r => r.PreferredTime).HasMaxLength(100);
+                e.Property(r => r.DoctorNote).HasMaxLength(1000);
+                e.Property(r => r.FeeOrderCode).HasMaxLength(64);
+                e.Property(r => r.Fee).HasPrecision(18, 2);
+                e.HasIndex(r => new { r.UserId, r.Status });
+                e.HasIndex(r => r.Status);
+                e.HasIndex(r => r.FeeOrderCode);
+            });
 
             // KHOÁ LẠC QUAN cho giao dịch thanh toán.
             // xmin là cột hệ thống PostgreSQL tự duy trì, đổi giá trị sau MỖI lần dòng

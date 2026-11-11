@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using MomOi.API.Constants;
 using MomOi.API.DTOs;
 using MomOi.API.DTOs.Payment;
+using MomOi.API.Models.Health;
 using MomOi.API.Models.Identity;
 using MomOi.API.Options;
 using MomOi.API.Repositories;
@@ -236,6 +237,10 @@ namespace MomOi.API.Services.Payment
                 return new IpnResult("01", "Order not found");
             }
 
+            // ── PHÍ "BÁC SĨ GỌI LẠI": chốt đơn + đánh dấu đã trả phí, KHÔNG đổi tier ──
+            if (string.Equals(txn.PlanCode, DoctorCallbackPricing.FeePlanCode, StringComparison.OrdinalIgnoreCase))
+                return await ConfirmCallbackFeeAsync(txn, repo, orderCode);
+
             // ── NÂNG HẠNG GÓI VÀ CHỐT ĐƠN PHẢI LÀ MỘT KHỐI NGUYÊN TỬ ───────────────
             // Bản cũ commit hai lần rời nhau: nâng tier cho user trước, chốt đơn sau.
             // Nếu lần commit thứ hai hỏng, user ĐÃ được cộng hạn nhưng đơn vẫn Pending
@@ -377,6 +382,112 @@ namespace MomOi.API.Services.Payment
                 tierExpiresAt = user?.TierExpiresAt,
                 transactions = result
             }, "Lay lich su thanh toan thanh cong.");
+        }
+
+        public async Task<ApiResponse<CreatePaymentResponseDto>> CreateDoctorCallbackFeePaymentAsync(
+            string userId, int callbackId)
+        {
+            var callbacks = _unitOfWork.Repository<DoctorCallbackRequest>();
+            var callback = await callbacks.FirstOrDefaultAsync(c => c.Id == callbackId && c.UserId == userId);
+            if (callback == null)
+                return ApiResponse<CreatePaymentResponseDto>.FailureResult(
+                    "Không tìm thấy yêu cầu tư vấn.", errorCode: "CALLBACK_NOT_FOUND");
+
+            if (callback.Status != DoctorCallbackStatus.Completed || callback.Fee <= 0)
+                return ApiResponse<CreatePaymentResponseDto>.FailureResult(
+                    "Cuộc gọi này không phát sinh phí.", errorCode: "CALLBACK_NO_FEE");
+
+            if (callback.FeePaidAt != null)
+                return ApiResponse<CreatePaymentResponseDto>.FailureResult(
+                    "Phí cuộc tư vấn này đã được thanh toán.", errorCode: "CALLBACK_FEE_PAID");
+
+            var payments = _unitOfWork.Repository<PaymentTransaction>();
+
+            // Mẹ bấm "Thanh toán" nhiều lần thì trả lại đúng đơn cũ, tránh sinh nhiều mã
+            // chuyển khoản cho cùng một khoản phí.
+            PaymentTransaction? txn = null;
+            if (!string.IsNullOrEmpty(callback.FeeOrderCode))
+            {
+                txn = await payments.FirstOrDefaultAsync(t =>
+                    t.OrderCode == callback.FeeOrderCode && t.Status == PaymentStatus.Pending);
+            }
+
+            if (txn == null)
+            {
+                txn = new PaymentTransaction
+                {
+                    UserId = userId,
+                    OrderCode = await GenerateUniqueOrderCodeAsync(),
+                    PlanCode = DoctorCallbackPricing.FeePlanCode,
+                    TargetTier = SubscriptionTier.Free,
+                    DurationMonths = 0,
+                    Amount = callback.Fee,
+                    Currency = "VND",
+                    PaymentMethod = "BankTransfer",
+                    Status = PaymentStatus.Pending
+                };
+
+                await payments.AddAsync(txn);
+                callback.FeeOrderCode = txn.OrderCode;
+                callbacks.Update(callback);
+                await _unitOfWork.SaveChangesAsync();
+
+                _logger.LogInformation("Created callback fee payment {OrderCode} for callback {CallbackId}, user {UserId}.",
+                    txn.OrderCode, callbackId, userId);
+            }
+
+            var memo = BuildTransferMemo(txn.OrderCode);
+            var qr = BuildVietQrUrl(txn.Amount, memo);
+            return ApiResponse<CreatePaymentResponseDto>.SuccessResult(new CreatePaymentResponseDto
+            {
+                OrderCode = txn.OrderCode,
+                PayUrl = qr,
+                QrUrl = qr,
+                Amount = txn.Amount,
+                PlanName = DoctorCallbackPricing.FeePlanName,
+                PlanCode = txn.PlanCode,
+                Provider = txn.PaymentMethod,
+                TransferMemo = memo,
+                BankInfo = BuildBankInfo(),
+                CreatedAt = txn.CreatedAt
+            }, "Đã tạo mã thanh toán phí tư vấn.");
+        }
+
+        private async Task<IpnResult> ConfirmCallbackFeeAsync(
+            PaymentTransaction txn, IGenericRepository<PaymentTransaction> repo, string orderCode)
+        {
+            try
+            {
+                await _unitOfWork.ExecuteInTransactionAsync(async () =>
+                {
+                    txn.Status = PaymentStatus.Completed;
+                    txn.PaidAt = DateTime.UtcNow;
+                    repo.Update(txn);
+
+                    var callbacks = _unitOfWork.Repository<DoctorCallbackRequest>();
+                    var callback = await callbacks.FirstOrDefaultAsync(c => c.FeeOrderCode == orderCode);
+                    if (callback != null && callback.FeePaidAt == null)
+                    {
+                        callback.FeePaidAt = txn.PaidAt;
+                        callbacks.Update(callback);
+                    }
+
+                    await _unitOfWork.SaveChangesAsync();
+                });
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                _logger.LogWarning("Callback fee {OrderCode} was confirmed concurrently by another request.", orderCode);
+                return new IpnResult("02", "Order already confirmed");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to confirm callback fee {OrderCode}; transaction rolled back.", orderCode);
+                return new IpnResult("99", "Failed to update account");
+            }
+
+            _logger.LogInformation("Callback fee {OrderCode} paid.", orderCode);
+            return new IpnResult("00", "Confirm Success");
         }
 
         private static string GenerateOrderCode() =>
