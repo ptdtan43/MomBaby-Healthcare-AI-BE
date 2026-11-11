@@ -17,7 +17,7 @@ namespace MomOi.API.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.31")
+                .HasAnnotation("ProductVersion", "8.0.33")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -681,6 +681,91 @@ namespace MomOi.API.Migrations
                         .HasDatabaseName("ix_diet_plans_user_id");
 
                     b.ToTable("diet_plans", (string)null);
+                });
+
+            modelBuilder.Entity("MomOi.API.Models.Health.DoctorCallbackRequest", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Concern")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("concern");
+
+                    b.Property<string>("ContactPhone")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("contact_phone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DoctorNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("doctor_note");
+
+                    b.Property<decimal>("Fee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("fee");
+
+                    b.Property<string>("FeeOrderCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("fee_order_code");
+
+                    b.Property<DateTime?>("FeePaidAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fee_paid_at");
+
+                    b.Property<DateTime?>("HandledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("handled_at");
+
+                    b.Property<string>("HandledByUserId")
+                        .HasColumnType("text")
+                        .HasColumnName("handled_by_user_id");
+
+                    b.Property<string>("PreferredTime")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("preferred_time");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_doctor_callback_requests");
+
+                    b.HasIndex("FeeOrderCode")
+                        .HasDatabaseName("ix_doctor_callback_requests_fee_order_code");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_doctor_callback_requests_status");
+
+                    b.HasIndex("UserId", "Status")
+                        .HasDatabaseName("ix_doctor_callback_requests_user_id_status");
+
+                    b.ToTable("doctor_callback_requests", (string)null);
                 });
 
             modelBuilder.Entity("MomOi.API.Models.Health.EpdsAssessment", b =>
@@ -2214,6 +2299,18 @@ namespace MomOi.API.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_diet_plans_users_user_id");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("MomOi.API.Models.Health.DoctorCallbackRequest", b =>
+                {
+                    b.HasOne("MomOi.API.Models.Identity.AppUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_doctor_callback_requests_users_user_id");
 
                     b.Navigation("User");
                 });

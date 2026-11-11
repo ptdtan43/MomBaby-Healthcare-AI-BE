@@ -26,5 +26,11 @@ namespace MomOi.API.Services.Payment
         Task<ApiResponse<PaymentStatusDto>> GetStatusAsync(string userId, string orderCode);
 
         Task<ApiResponse<object>> GetHistoryAsync(string userId);
+
+        /// <summary>
+        /// Tạo (hoặc trả lại đơn đang chờ) mã VietQR thu phí cho một cuộc "bác sĩ gọi lại"
+        /// đã hoàn tất. Xác nhận thanh toán loại này không đổi tier của người dùng.
+        /// </summary>
+        Task<ApiResponse<CreatePaymentResponseDto>> CreateDoctorCallbackFeePaymentAsync(string userId, int callbackId);
     }
 }
