@@ -215,6 +215,7 @@ namespace MomOi.API.Data
             builder.Entity<DoctorCallbackRequest>(e =>
             {
                 e.HasOne(r => r.User).WithMany().HasForeignKey(r => r.UserId).OnDelete(DeleteBehavior.Cascade);
+                e.HasOne(r => r.SymptomLog).WithMany().HasForeignKey(r => r.SymptomLogId).OnDelete(DeleteBehavior.SetNull);
                 e.Property(r => r.ContactPhone).HasMaxLength(20);
                 e.Property(r => r.Concern).HasMaxLength(1000);
                 e.Property(r => r.PreferredTime).HasMaxLength(100);

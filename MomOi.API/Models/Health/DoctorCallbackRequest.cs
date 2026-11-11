@@ -31,6 +31,13 @@ namespace MomOi.API.Models.Health
         /// <summary>Mô tả ngắn điều mẹ muốn hỏi, để bác sĩ chuẩn bị trước khi gọi.</summary>
         public string Concern { get; set; } = string.Empty;
 
+        /// <summary>
+        /// Lần kiểm tra triệu chứng mẹ đính kèm (tuỳ chọn), để bác sĩ xem ảnh và kết quả AI
+        /// trước khi gọi. Null khi mẹ không đính kèm hoặc đã xoá bản ghi đó.
+        /// </summary>
+        public int? SymptomLogId { get; set; }
+        public SymptomLog? SymptomLog { get; set; }
+
         /// <summary>Khung giờ mẹ tiện nghe máy (tuỳ chọn), ví dụ "Sau 19h".</summary>
         public string? PreferredTime { get; set; }
 

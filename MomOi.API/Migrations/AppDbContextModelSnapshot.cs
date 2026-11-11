@@ -744,6 +744,10 @@ namespace MomOi.API.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("status");
 
+                    b.Property<int?>("SymptomLogId")
+                        .HasColumnType("integer")
+                        .HasColumnName("symptom_log_id");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -761,6 +765,9 @@ namespace MomOi.API.Migrations
 
                     b.HasIndex("Status")
                         .HasDatabaseName("ix_doctor_callback_requests_status");
+
+                    b.HasIndex("SymptomLogId")
+                        .HasDatabaseName("ix_doctor_callback_requests_symptom_log_id");
 
                     b.HasIndex("UserId", "Status")
                         .HasDatabaseName("ix_doctor_callback_requests_user_id_status");
@@ -2305,12 +2312,20 @@ namespace MomOi.API.Migrations
 
             modelBuilder.Entity("MomOi.API.Models.Health.DoctorCallbackRequest", b =>
                 {
+                    b.HasOne("MomOi.API.Models.Health.SymptomLog", "SymptomLog")
+                        .WithMany()
+                        .HasForeignKey("SymptomLogId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_doctor_callback_requests_symptom_logs_symptom_log_id");
+
                     b.HasOne("MomOi.API.Models.Identity.AppUser", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_doctor_callback_requests_users_user_id");
+
+                    b.Navigation("SymptomLog");
 
                     b.Navigation("User");
                 });

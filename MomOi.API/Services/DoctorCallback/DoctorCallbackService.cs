@@ -89,9 +89,16 @@ namespace MomOi.API.Services.DoctorCallback
                     "Mẹ còn phí cuộc tư vấn trước chưa thanh toán. Vui lòng thanh toán để gửi yêu cầu mới.",
                     errorCode: "CALLBACK_FEE_UNPAID");
 
+            if (dto.SymptomLogId is { } symptomId
+                && !await _unitOfWork.Repository<SymptomLog>().ExistsAsync(s => s.Id == symptomId && s.UserId == userId))
+                return ApiResponse<DoctorCallbackDto>.FailureResult(
+                    "Không tìm thấy lần kiểm tra triệu chứng muốn đính kèm.",
+                    errorCode: "SYMPTOM_NOT_FOUND");
+
             var entity = new DoctorCallbackRequest
             {
                 UserId = userId,
+                SymptomLogId = dto.SymptomLogId,
                 ContactPhone = phone,
                 Concern = concern,
                 PreferredTime = string.IsNullOrWhiteSpace(dto.PreferredTime) ? null : dto.PreferredTime.Trim(),
@@ -151,8 +158,42 @@ namespace MomOi.API.Services.DoctorCallback
                 .Take(100)
                 .ToListAsync();
 
-            return ApiResponse<IReadOnlyList<DoctorCallbackQueueItemDto>>.SuccessResult(
-                items.Select(ToQueueDto).ToList());
+            // Ảnh triệu chứng có thể nặng (data URL) nên chỉ tải cho yêu cầu đang chờ gọi.
+            var symptomIds = items
+                .Where(r => r.Status == DoctorCallbackStatus.Pending && r.SymptomLogId != null)
+                .Select(r => r.SymptomLogId!.Value)
+                .Distinct()
+                .ToList();
+            var symptoms = symptomIds.Count == 0
+                ? new Dictionary<int, SymptomLog>()
+                : (await _unitOfWork.Repository<SymptomLog>()
+                    .FindAsync(s => symptomIds.Contains(s.Id), asNoTracking: true))
+                    .ToDictionary(s => s.Id);
+
+            var result = items.Select(r =>
+            {
+                var dto = ToQueueDto(r);
+                if (r.Status == DoctorCallbackStatus.Pending
+                    && r.SymptomLogId is { } sid
+                    && symptoms.TryGetValue(sid, out var log)
+                    && log.UserId == r.UserId)
+                {
+                    dto.Symptom = new AttachedSymptomDto
+                    {
+                        Id = log.Id,
+                        TextDescription = log.TextDescription,
+                        ImageUrl = string.IsNullOrWhiteSpace(log.ImageUrl) ? log.Images.FirstOrDefault() : log.ImageUrl,
+                        UrgencyLevel = log.UrgencyLevel?.ToString(),
+                        ShouldSeeDoctor = log.ShouldSeeDoctor,
+                        SpecialistType = log.SpecialistType,
+                        AnalysisJson = log.PossibleConditionsJson,
+                        CreatedAt = log.CreatedAt
+                    };
+                }
+                return dto;
+            }).ToList();
+
+            return ApiResponse<IReadOnlyList<DoctorCallbackQueueItemDto>>.SuccessResult(result);
         }
 
         public Task<ApiResponse<DoctorCallbackQueueItemDto>> CompleteAsync(string expertId, int id, string? note) =>
@@ -226,6 +267,7 @@ namespace MomOi.API.Services.DoctorCallback
             dto.FeeDue = r.Status == DoctorCallbackStatus.Completed && r.Fee > 0 && r.FeePaidAt == null;
             dto.FeePaidAt = r.FeePaidAt;
             dto.FeeOrderCode = r.FeeOrderCode;
+            dto.SymptomLogId = r.SymptomLogId;
             dto.CreatedAt = r.CreatedAt;
             dto.HandledAt = r.HandledAt;
             return dto;
