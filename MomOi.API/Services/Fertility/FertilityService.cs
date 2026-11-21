@@ -165,6 +165,8 @@ namespace MomOi.API.Services.Fertility
             {
                 IsInFertileWindow = isInWindow,
                 DaysUntilOvulation = daysUntilOvulation,
+                // 0 = kỳ kinh dự kiến bắt đầu hôm nay.
+                DaysUntilNextPeriod = cycleDay == 0 ? 0 : cycleLength - cycleDay,
                 // Bản Play không nói về thụ thai: trả câu trung tính về theo dõi chu kỳ.
                 Recommendation = _appEdition?.IsPlayEdition == true
                     ? "Mẹ ghi kỳ kinh đều đặn để lịch dự đoán chính xác hơn."
