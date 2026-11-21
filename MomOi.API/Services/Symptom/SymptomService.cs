@@ -66,7 +66,8 @@ namespace MomOi.API.Services.Symptom
                          $"\"disclaimer\":\"...\",\"shouldSeeDoctor\":false,\"specialistType\":\"...\"," +
                          $"\"severityScore\":0}}\n\n" +
                          $"severityScore là số nguyên trên thang 0–100 (0 = không đáng lo, 100 = nguy hiểm tính mạng), " +
-                         $"phải nhất quán với urgencyLevel: Thấp 0–29, Trung bình 30–59, Cao 60–84, Khẩn cấp 85–100.";
+                         $"phải nhất quán với urgencyLevel: Thấp 0–29, Trung bình 30–59, Cao 60–84, Khẩn cấp 85–100. " +
+                         $"Các chuỗi là văn bản thuần, không dùng định dạng Markdown (không **, #, _).";
 
             string aiResponseJson = string.Empty;
             int severityScore = 0;
@@ -78,6 +79,8 @@ namespace MomOi.API.Services.Symptom
             try
             {
                 aiResponseJson = await _geminiService.GenerateJsonAsync(prompt, request.ImageUrl, request.ImageMimeType);
+                // App và web hiển thị chuỗi thô: bỏ dấu in đậm Markdown nếu AI vẫn trả về.
+                aiResponseJson = aiResponseJson.Replace("**", string.Empty);
 
                 using var doc = System.Text.Json.JsonDocument.Parse(aiResponseJson);
                 if (doc.RootElement.TryGetProperty("severityScore", out var scoreEl))
