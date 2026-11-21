@@ -143,6 +143,30 @@ namespace MomOi.Tests
             Assert.Contains("Cửa sổ thụ thai", alert.TitleVi);
         }
 
+        [Fact]
+        public async Task EvaluateAsync_BR01_PlayEdition_NoAlert()
+        {
+            // Bản Play (header X-App-Edition: play) không được có nội dung thụ thai.
+            var options = CreateInMemoryOptions();
+            using var context = new AppDbContext(options);
+            var (mockGemini, mockHub) = CreateServiceMocks();
+            var playEdition = new Mock<MomOi.API.Services.AppEdition.IAppEditionContext>();
+            playEdition.Setup(e => e.IsPlayEdition).Returns(true);
+            var engine = new BusinessRuleEngine(context, mockGemini.Object, mockHub.Object, appEdition: playEdition.Object);
+
+            var profile = new MomHealthProfile
+            {
+                UserId = "user-1",
+                Stage = JourneyStage.PrePregnancy,
+                AvgCycleLength = 28,
+                LastPeriodDate = DateTime.UtcNow.Date.AddDays(-13)
+            };
+
+            var alerts = await engine.EvaluateAsync(profile);
+
+            Assert.DoesNotContain(alerts, a => a.RuleId == "BR01");
+        }
+
         private static MomHealthProfile PregnantProfile(string userId) => new()
         {
             UserId = userId,

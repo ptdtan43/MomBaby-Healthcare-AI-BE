@@ -5,6 +5,7 @@ using MomOi.API.Models;
 using MomOi.API.Models.Health;
 using MomOi.API.Repositories;
 using MomOi.API.Services.AI;
+using MomOi.API.Services.AppEdition;
 using MomOi.API.Services.Integration;
 using Microsoft.Extensions.Logging;
 using System;
@@ -18,15 +19,18 @@ namespace MomOi.API.Services.Symptom
         private readonly IUnitOfWork _unitOfWork;
         private readonly IGeminiService _geminiService;
         private readonly ILogger<SymptomService> _logger;
+        private readonly IAppEditionContext? _appEdition;
 
         public SymptomService(
             IUnitOfWork unitOfWork,
             IGeminiService geminiService,
-            ILogger<SymptomService> logger)
+            ILogger<SymptomService> logger,
+            IAppEditionContext? appEdition = null)
         {
             _unitOfWork = unitOfWork;
             _geminiService = geminiService;
             _logger = logger;
+            _appEdition = appEdition;
         }
 
         public async Task<ApiResponse<object>> AddSymptomEntryAsync(string userId, SymptomRequestDto request)
@@ -41,8 +45,20 @@ namespace MomOi.API.Services.Symptom
             var profile = await _unitOfWork.Repository<MomHealthProfile>().FirstOrDefaultAsync(p => p.UserId == userId);
             var profileStage = profile?.Stage.ToString() ?? "unknown";
 
-            var prompt = $"Bạn là chuyên gia tư vấn sức khỏe sản khoa. Phân tích các triệu chứng sau của mẹ " +
-                         $"đang ở giai đoạn {profileStage}:\n\n\"{request.TextDescription}\"\n\n" +
+            // Bản Play (tài khoản cá nhân) không được có nội dung mang thai / thụ thai: không gửi giai đoạn
+            // cho AI và dặn AI tránh hẳn các chủ đề đó. Web giữ prompt cũ.
+            var isPlay = _appEdition?.IsPlayEdition == true;
+            var intro = isPlay
+                ? "Bạn là chuyên gia tư vấn sức khỏe và lối sống cho phụ nữ và chăm sóc trẻ nhỏ. " +
+                  "Người dùng là phụ nữ đang theo dõi chu kỳ kinh nguyệt, ăn uống, giấc ngủ và vận động, hoặc đang chăm con nhỏ. " +
+                  "TUYỆT ĐỐI KHÔNG nhắc tới mang thai, chuẩn bị mang thai, thụ thai, sinh sản, sau sinh hay tình dục trong bất kỳ trường nào, " +
+                  "trừ khi chính câu hỏi của người dùng nói về chủ đề đó; khi đó chỉ khuyên người dùng hỏi bác sĩ. " +
+                  "Phân tích nội dung sau của người dùng:\n\n"
+                : $"Bạn là chuyên gia tư vấn sức khỏe sản khoa. Phân tích các triệu chứng sau của mẹ " +
+                  $"đang ở giai đoạn {profileStage}:\n\n";
+
+            var prompt = intro +
+                         $"\"{request.TextDescription}\"\n\n" +
                          $"Trả về JSON với cấu trúc: " +
                          $"{{\"possibleConditions\":[{{\"name\":\"...\",\"probability\":\"Có thể\",\"description\":\"...\"}}]," +
                          $"\"lifestyleConnection\":\"...\",\"urgencyLevel\":\"Thấp|Trung bình|Cao|Khẩn cấp\"," +

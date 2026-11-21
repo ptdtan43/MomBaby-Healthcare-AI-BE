@@ -6,6 +6,7 @@ using MomOi.API.Hubs;
 using MomOi.API.Models.Health;
 using MomOi.API.Models.Nutrition;
 using MomOi.API.Services.AI;
+using MomOi.API.Services.AppEdition;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -23,17 +24,20 @@ namespace MomOi.API.Services.BusinessRules
         private readonly IGeminiService? _geminiService;
         private readonly IHubContext<AlertHub>? _hubContext;
         private readonly ILogger<BusinessRuleEngine>? _logger;
+        private readonly IAppEditionContext? _appEdition;
 
         public BusinessRuleEngine(
             AppDbContext? context = null, 
             IGeminiService? geminiService = null, 
             IHubContext<AlertHub>? hubContext = null,
-            ILogger<BusinessRuleEngine>? logger = null)
+            ILogger<BusinessRuleEngine>? logger = null,
+            IAppEditionContext? appEdition = null)
         {
             _context = context;
             _geminiService = geminiService;
             _hubContext = hubContext;
             _logger = logger;
+            _appEdition = appEdition;
         }
 
         #region Legacy Rule Methods
@@ -244,7 +248,9 @@ namespace MomOi.API.Services.BusinessRules
             var tomorrowStartUtc = todayStartUtc.AddDays(1);
 
             // ── BR01 — Fertility Window Alert ──────────────────────────────────
-            if (profile.Stage == JourneyStage.PrePregnancy && profile.LastPeriodDate.HasValue)
+            // Bản Play (tài khoản cá nhân) không được có nội dung thụ thai: không tạo / đẩy BR01.
+            if (_appEdition?.IsPlayEdition != true
+                && profile.Stage == JourneyStage.PrePregnancy && profile.LastPeriodDate.HasValue)
             {
                 int avgCycle = profile.AvgCycleLength ?? 28;
                 int cycleDay = (today - profile.LastPeriodDate.Value.Date).Days + 1;

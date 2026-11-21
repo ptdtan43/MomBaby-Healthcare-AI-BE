@@ -4,6 +4,7 @@ using MomOi.API.Models;
 using MomOi.API.Models.Health;
 using MomOi.API.Repositories;
 using MomOi.API.Services.AI;
+using MomOi.API.Services.AppEdition;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,15 +19,18 @@ namespace MomOi.API.Services.AIFeatures
         private readonly IGeminiService _geminiService;
         private readonly IUnitOfWork _unitOfWork;
         private readonly ILogger<AIFeatureService> _logger;
+        private readonly IAppEditionContext? _appEdition;
 
         public AIFeatureService(
             IGeminiService geminiService,
             IUnitOfWork unitOfWork,
-            ILogger<AIFeatureService> logger)
+            ILogger<AIFeatureService> logger,
+            IAppEditionContext? appEdition = null)
         {
             _geminiService = geminiService;
             _unitOfWork = unitOfWork;
             _logger = logger;
+            _appEdition = appEdition;
         }
 
         public async Task<ApiResponse<object>> GenerateAIRecipesAsync(string userId, GenerateAiRecipesRequestDto request)
@@ -40,7 +44,7 @@ namespace MomOi.API.Services.AIFeatures
             JsonElement recipesArray;
             try
             {
-                aiResponseJson = await _geminiService.GenerateMultiAiDietRecipesAsync(request.Query);
+                aiResponseJson = await _geminiService.GenerateMultiAiDietRecipesAsync(request.Query, _appEdition?.IsPlayEdition == true);
                 using var doc = JsonDocument.Parse(aiResponseJson);
                 recipesArray = doc.RootElement.Clone();
                 

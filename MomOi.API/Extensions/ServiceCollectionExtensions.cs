@@ -14,6 +14,7 @@ using MomOi.API.Models.Identity;
 using MomOi.API.Options;
 using MomOi.API.Repositories;
 using MomOi.API.Services.AI;
+using MomOi.API.Services.AppEdition;
 using MomOi.API.Services.Admin;
 using MomOi.API.Services.AIFeatures;
 using MomOi.API.Services.Alert;
@@ -194,6 +195,10 @@ namespace MomOi.API.Extensions
             services.AddScoped<IWellnessService, WellnessService>();
             services.AddOptions<RelaxAudioOptions>().BindConfiguration(RelaxAudioOptions.SectionName);
             services.AddScoped<IFeedbackService, FeedbackService>();
+
+            // Bản app gửi request (header X-App-Edition). Bản Play bỏ nội dung mang thai / thụ thai.
+            services.AddHttpContextAccessor();
+            services.AddScoped<IAppEditionContext, AppEditionContext>();
 
             // Thanh toán. BindConfiguration tự lấy IConfiguration từ DI nên không cần truyền vào.
             services.AddOptions<VnPayOptions>().BindConfiguration(VnPayOptions.SectionName);

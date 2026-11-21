@@ -1,6 +1,7 @@
 using MomOi.API.DTOs;
 using MomOi.API.Models.Health;
 using MomOi.API.Repositories;
+using MomOi.API.Services.AppEdition;
 using MomOi.API.Services.BusinessRules;
 using System;
 using System.Collections.Generic;
@@ -14,13 +15,16 @@ namespace MomOi.API.Services.Fertility
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IBusinessRuleEngine _ruleEngine;
+        private readonly IAppEditionContext? _appEdition;
 
         public FertilityService(
             IUnitOfWork unitOfWork,
-            IBusinessRuleEngine ruleEngine)
+            IBusinessRuleEngine ruleEngine,
+            IAppEditionContext? appEdition = null)
         {
             _unitOfWork = unitOfWork;
             _ruleEngine = ruleEngine;
+            _appEdition = appEdition;
         }
 
         public async Task<ApiResponse<object>> LogCycleAsync(string userId, DateTime periodStartDate, int cycleLength, string[] symptoms)
@@ -161,7 +165,10 @@ namespace MomOi.API.Services.Fertility
             {
                 IsInFertileWindow = isInWindow,
                 DaysUntilOvulation = daysUntilOvulation,
-                Recommendation = br01Alert != null ? br01Alert.SuggestionVi : "Hiện tại mami chưa nằm trong cửa sổ thụ thai vàng. Hãy giữ tinh thần vui vẻ thoải mái nhé."
+                // Bản Play không nói về thụ thai: trả câu trung tính về theo dõi chu kỳ.
+                Recommendation = _appEdition?.IsPlayEdition == true
+                    ? "Mẹ ghi kỳ kinh đều đặn để lịch dự đoán chính xác hơn."
+                    : br01Alert != null ? br01Alert.SuggestionVi : "Hiện tại mami chưa nằm trong cửa sổ thụ thai vàng. Hãy giữ tinh thần vui vẻ thoải mái nhé."
             };
 
             return ApiResponse<object>.SuccessResult(result);

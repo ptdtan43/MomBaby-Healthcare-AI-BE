@@ -53,6 +53,7 @@ namespace MomOi.API.Services.AI
         /// <summary>
         /// Generates multiple recipes via AI based on a query.
         /// </summary>
-        Task<string> GenerateMultiAiDietRecipesAsync(string query);
+        /// <param name="playEdition">Bản Play: gợi ý món cho phụ nữ nói chung, không nhắc mang thai.</param>
+        Task<string> GenerateMultiAiDietRecipesAsync(string query, bool playEdition = false);
     }
 }

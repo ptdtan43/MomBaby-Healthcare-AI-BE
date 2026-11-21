@@ -255,7 +255,7 @@ namespace MomOi.API.Services.AI
             }
         }
 
-        public async Task<string> GenerateMultiAiDietRecipesAsync(string query)
+        public async Task<string> GenerateMultiAiDietRecipesAsync(string query, bool playEdition = false)
         {
             // Không trả món mẫu: AIFeatureService lưu kết quả thành công thức chờ chuyên gia duyệt.
             if (string.IsNullOrEmpty(_apiKey))
@@ -263,7 +263,12 @@ namespace MomOi.API.Services.AI
 
             try
             {
-                var prompt = $@"Bạn là một chuyên gia dinh dưỡng cho mẹ bầu. Nhiệm vụ của bạn là kiểm tra đầu vào và gợi ý công thức nấu ăn.
+                // Bản Play (tài khoản cá nhân) không được có nội dung mang thai: đổi đối tượng sang phụ nữ nói chung.
+                var audience = playEdition ? "phụ nữ và gia đình" : "mẹ bầu";
+                var audienceRule = playEdition
+                    ? " KHÔNG nhắc tới mang thai, mẹ bầu, thai kỳ, thụ thai hay sau sinh trong tên món, nguyên liệu hay các bước."
+                    : "";
+                var prompt = $@"Bạn là một chuyên gia dinh dưỡng cho {audience}. Nhiệm vụ của bạn là kiểm tra đầu vào và gợi ý công thức nấu ăn.
 
 **BƯỚC 1: KIỂM TRA ĐẦU VÀO**
 Yêu cầu của người dùng: '{query}'
@@ -276,7 +281,7 @@ Hãy kiểm tra kỹ tất cả các thành phần trong yêu cầu trên (phầ
 - Nếu phần Nguyên liệu có sẵn ghi ""Không"" hoặc để trống thì bỏ qua kiểm tra phần đó.
 
 **BƯỚC 2: TẠO CÔNG THỨC (chỉ thực hiện nếu đầu vào hợp lệ)**
-Gợi ý 3 món ăn đơn giản, bổ dưỡng cho mẹ bầu. Ước lượng đầy đủ các chỉ số dinh dưỡng cho MỘT khẩu phần: calories (số kcal), protein/carbs/fat (số gam, ghi kèm đơn vị 'g'), prepTime (thời gian nấu) và difficulty (Dễ|Trung bình|Khó).
+Gợi ý 3 món ăn đơn giản, bổ dưỡng cho {audience}.{audienceRule} Ước lượng đầy đủ các chỉ số dinh dưỡng cho MỘT khẩu phần: calories (số kcal), protein/carbs/fat (số gam, ghi kèm đơn vị 'g'), prepTime (thời gian nấu) và difficulty (Dễ|Trung bình|Khó).
 
 Trả về ĐÚNG MỘT khối JSON MẢNG (Array) hợp lệ:
 [
